@@ -139,7 +139,8 @@ window.MW = window.MW || {};
       '<code>Ctrl+Z</code> undo, <code>Ctrl+Shift+Z</code> redo'],
     'help.keys.3': ['<code>Ctrl+D</code> kreslenie symbolu', '<code>Ctrl+D</code> draw a symbol'],
     'help.keys.4': ['<code>Ctrl+K</code> paleta symbolov', '<code>Ctrl+K</code> symbol palette'],
-    'help.keys.5': ['<code>Esc</code> zavrie panely', '<code>Esc</code> closes panels'],
+    'help.keys.5': ['<code>Ctrl+E</code> kalkulačka', '<code>Ctrl+E</code> calculator'],
+    'help.keys.6': ['<code>Esc</code> zavrie panely', '<code>Esc</code> closes panels'],
 
     'help.foot': ['Všetko sa priebežne ukladá do tohto prehliadača. Tlačidlom <b>Uložiť</b> si plochu stiahneš ako súbor.',
       'Everything is saved into this browser as you go. The <b>Save</b> button downloads the canvas as a file.'],

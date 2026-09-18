@@ -407,7 +407,37 @@ await page.locator('[data-close="feedback"]').click();
 await page.locator('#btn-help').click();
 await page.waitForSelector('#help:not([hidden])');
 await page.screenshot({ path: resolve(shots, '05-napoveda.png') });
+
+const help = await page.locator('.help-card').evaluate((card) => {
+  const cols = getComputedStyle(card.querySelector('.help-cols')).gridTemplateColumns.split(' ').length;
+  const codes = [...card.querySelectorAll('code')];
+  return {
+    cols,
+    clipped: card.scrollHeight > card.clientHeight + 1,
+    // príkaz zalomený na dva riadky má vyšší rámček než jeden riadok textu
+    brokenCode: codes.filter((c) => c.getClientRects().length > 1).length,
+    overflowsSide: card.scrollWidth > card.clientWidth + 1
+  };
+});
+check('nápoveda má dva rovnaké stĺpce', help.cols === 2, `stĺpcov=${help.cols}`);
+check('nápoveda sa zmestí bez odrezania', !help.clipped);
+check('nápoveda nepretína vodorovne', !help.overflowsSide);
+check('žiadny príkaz nie je zalomený na dva riadky', help.brokenCode === 0,
+  `zalomených=${help.brokenCode}`);
+
+// lišta musí držať jeden riadok aj na bežnom notebooku
 await page.keyboard.press('Escape');
+await page.setViewportSize({ width: 1280, height: 860 });
+await page.waitForTimeout(120);
+const rows1280 = await page.locator('.topbar').evaluate((bar) => {
+  const mids = [...bar.children].map((el) => {
+    const r = el.getBoundingClientRect();
+    return Math.round(r.top + r.height / 2);
+  });
+  return new Set(mids).size;
+});
+check('lišta drží jeden riadok aj pri 1280 px', rows1280 === 1, `riadkov=${rows1280}`);
+await page.setViewportSize({ width: 1440, height: 900 });
 
 check('žiadne chyby v konzole počas testu', errors.length === 0, errors.slice(0, 3).join(' | '));
 

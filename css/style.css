@@ -609,13 +609,36 @@ button, input { font: inherit; color: inherit; }
 }
 
 .help-card .close { position: absolute; top: 14px; right: 16px; }
-.help-card h2 { margin: 0 0 18px; font-size: 21px; }
-.help-card h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent-2); text-transform: uppercase; letter-spacing: .8px; }
-.help-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 22px 32px; }
+.help-card h2 { margin: 0 0 20px; font-size: 21px; }
+.help-card h3 { margin: 0 0 10px; font-size: 13px; color: var(--accent-2); text-transform: uppercase; letter-spacing: .8px; }
+
+/* Dva rovnaké stĺpce: štyri sekcie tak sadnú do úhľadnej mriežky 2×2.
+   Pri automatickom počte stĺpcov ostávala štvrtá sekcia sama v druhom riadku. */
+.help-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 36px;
+}
+
 .help-card ul { margin: 0; padding-left: 18px; color: var(--muted); }
-.help-card li { margin-bottom: 5px; }
-.help-card code { background: var(--bg-2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: var(--accent-2); }
-.help-foot { margin: 22px 0 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.help-card li { margin-bottom: 7px; line-height: 1.55; }
+
+/* Príkaz sa nesmie zalomiť uprostred – \sqrt[3]{8} patrí na jeden riadok. */
+.help-card code {
+  background: var(--bg-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+
+.help-foot { margin: 24px 0 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .help-cols { grid-template-columns: 1fr; }
+  .help-card { padding: 22px 20px 20px; }
+}
 
 .toast {
   position: fixed;
@@ -685,12 +708,12 @@ button, input { font: inherit; color: inherit; }
   .toolgroup button { padding: 6px 9px; }
 }
 
-@media (max-width: 1240px) {
+@media (max-width: 1400px) {
   .tool i { display: none; }
 }
 
-@media (max-width: 1080px) {
-  #btn-draw i, #btn-palette i { display: none; }
+@media (max-width: 1200px) {
+  #btn-draw i, #btn-palette i, #btn-calc i { display: none; }
 }
 
 @media (max-width: 860px) {
@@ -699,8 +722,11 @@ button, input { font: inherit; color: inherit; }
 }
 
 @media (max-width: 720px) {
-  .brand span:not(.logo), .toolgroup button span + * { }
-  .topbar { gap: 8px; padding: 7px 9px; }
-  .toolgroup button { padding: 6px 8px; }
-  .panel { top: auto; right: 8px; left: 8px; bottom: 8px; width: auto; height: 62vh; }
+  .topbar { gap: 6px; padding: 6px 8px; }
+  .topbar { padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+  .toolgroup { gap: 2px; padding: 2px; }
+  .toolgroup button { padding: 6px 7px; font-size: 13.5px; }
+  .langs button { padding: 6px 6px; }
+  .panel { top: auto; right: 8px; left: 8px; bottom: 8px; width: auto; height: 68vh; }
+  #hint { display: none; }
 }
