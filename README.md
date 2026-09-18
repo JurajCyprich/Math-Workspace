@@ -57,11 +57,18 @@ npm run build      # vyrobí math-workspace.html (~0,7 MB)
 Celá appka vrátane KaTeXu a jeho písiem zlepená do jediného HTML. Dá sa poslať
 mailom, hodiť na USB a otvoriť dvojklikom – funguje aj úplne bez internetu.
 
-### Na internet cez GitHub Pages
+### Na internet cez Vercel
+
+Na [vercel.com/new](https://vercel.com/new) vyber tento repozitár a daj *Deploy*.
+Nič sa nenastavuje – `vercel.json` v repozitári hovorí, že ide o statickú stránku
+bez kompilácie, takže sa nič neinštaluje ani nebuilduje. Každý ďalší push do
+`main` sa nasadí sám.
+
+### Alebo cez GitHub Pages
 
 Repozitár je statický web v koreňovom adresári, takže stačí v **Settings → Pages**
-zvoliť *Deploy from a branch*, vetvu `main` a priečinok `/ (root)`. O pár minút
-appka beží na `https://<meno>.github.io/Math-Workspace/`.
+zvoliť *Deploy from a branch*, vetvu `main` a priečinok `/ (root)`. Prvé
+zostavenie trvá aj pár minút – kým dobehne, adresa vracia 404.
 
 ## Ako funguje rozpoznávanie kresby
 

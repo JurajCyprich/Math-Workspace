@@ -1,0 +1,6 @@
+node_modules
+tests
+tools
+package.json
+package-lock.json
+math-workspace.html
