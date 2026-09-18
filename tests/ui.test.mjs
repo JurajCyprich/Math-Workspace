@@ -96,6 +96,12 @@ check('kreslenie vrátilo návrhy', cands.length > 0, cands.join(' '));
 check('medzi návrhmi je integrál', cands.includes('\\int'), cands.slice(0, 5).join(' '));
 await page.screenshot({ path: resolve(shots, '04-kreslenie.png') });
 
+await page.waitForTimeout(400);           // nech dobehne postupné nabiehanie
+const faded = await page.locator('#draw-results .hit').evaluateAll(
+  (els) => els.filter((el) => Number(getComputedStyle(el).opacity) < 0.99).length
+);
+check('všetky návrhy sú po animácii viditeľné', faded === 0, `priehľadných=${faded}`);
+
 const before = await page.locator('.block').first().locator('textarea').inputValue();
 await page.locator('#draw-results .hit').first().click();
 const afterDraw = await page.locator('.block').first().locator('textarea').inputValue();
@@ -157,20 +163,26 @@ await page.locator('.block').first().locator('.mode').click();
 
 /* 10. krok späť a dopredu ------------------------------------------- */
 await page.locator('.tool[data-tool="select"]').click();
+// Mazanie bloku sa krátko animuje, takže na počet treba chvíľu počkať.
+const settled = async (sel, n) => {
+  await page.waitForFunction(
+    ({ sel, n }) => document.querySelectorAll(sel).length === n, { sel, n }, { timeout: 3000}
+  ).catch(() => {});
+  return page.locator(sel).count();
+};
+
 const blocksBefore = await page.locator('.block').count();
 await page.locator('.block').last().locator('.del').click();
-check('blok sa zmazal', (await page.locator('.block').count()) === blocksBefore - 1);
+check('blok sa zmazal', (await settled('.block', blocksBefore - 1)) === blocksBefore - 1);
 
 await page.keyboard.press('Control+z');
-await page.waitForTimeout(120);
-check('Ctrl+Z vrátil zmazaný blok', (await page.locator('.block').count()) === blocksBefore,
-  `blokov=${await page.locator('.block').count()}`);
+check('Ctrl+Z vrátil zmazaný blok', (await settled('.block', blocksBefore)) === blocksBefore);
 
 await page.keyboard.press('Control+Shift+z');
-await page.waitForTimeout(120);
-check('Ctrl+Shift+Z zmazanie zopakoval', (await page.locator('.block').count()) === blocksBefore - 1);
+check('Ctrl+Shift+Z zmazanie zopakoval',
+  (await settled('.block', blocksBefore - 1)) === blocksBefore - 1);
 await page.keyboard.press('Control+z');
-await page.waitForTimeout(120);
+await settled('.block', blocksBefore);
 
 // zmazanie kresby sa tiež dá vrátiť
 await page.locator('.tool[data-tool="eraser"]').click();

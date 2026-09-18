@@ -190,6 +190,8 @@
     var data = { id: uid(), x: Math.round(x), y: Math.round(y), text: text || '', math: math !== false };
     state.blocks.push(data);
     makeBlock(data);
+    data.el.classList.add('entering');
+    setTimeout(function () { data.el.classList.remove('entering'); }, 220);
     commitStep();
     save();
     return data;
@@ -202,7 +204,9 @@
     if (i >= 0) state.blocks.splice(i, 1);
     if (activeEditor && activeEditor.block === data) activeEditor = null;
     if (selected === data) selected = null;
-    data.el.remove();
+    var el = data.el;
+    el.classList.add('leaving');
+    setTimeout(function () { el.remove(); }, 150);
     save();
   }
 

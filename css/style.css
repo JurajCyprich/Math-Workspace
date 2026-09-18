@@ -486,6 +486,45 @@ button, input { font: inherit; color: inherit; }
 
 .toast[hidden] { display: none; }
 
+/* ── animácie ─────────────────────────────────────────────────────── */
+
+@keyframes mw-block-in { from { opacity: 0; transform: translateY(-7px) scale(.97); } }
+@keyframes mw-block-out { to { opacity: 0; transform: scale(.96); } }
+@keyframes mw-panel-in { from { opacity: 0; transform: translateX(16px); } }
+@keyframes mw-fade-in { from { opacity: 0; } }
+@keyframes mw-pop-in { from { opacity: 0; transform: translateY(-5px); } }
+@keyframes mw-toast-in { from { opacity: 0; transform: translate(-50%, -10px); } }
+@keyframes mw-hit-in { from { opacity: 0; transform: translateY(5px); } }
+
+.block.entering { animation: mw-block-in .18s ease-out; }
+.block.leaving { animation: mw-block-out .15s ease-in forwards; pointer-events: none; }
+
+.panel { animation: mw-panel-in .18s ease-out; }
+.overlay { animation: mw-fade-in .16s ease-out; }
+.help-card { animation: mw-block-in .22s cubic-bezier(.2, .8, .3, 1); }
+.ac { animation: mw-pop-in .12s ease-out; }
+.toast { animation: mw-toast-in .18s cubic-bezier(.2, .8, .3, 1); }
+
+/* Návrhy po nakreslení pribúdajú zľava doprava, nie naraz. */
+.hit { animation: mw-hit-in .16s ease-out backwards; }
+.hit:nth-child(2) { animation-delay: 25ms; }
+.hit:nth-child(3) { animation-delay: 50ms; }
+.hit:nth-child(4) { animation-delay: 75ms; }
+.hit:nth-child(5) { animation-delay: 100ms; }
+.hit:nth-child(n+6) { animation-delay: 120ms; }
+
+.toolgroup button:active:not(:disabled) { transform: translateY(1px); }
+.sym:active { transform: scale(.94); }
+.snip:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: #3a4270; border-radius: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
