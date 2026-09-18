@@ -28,10 +28,11 @@ Stačí otvoriť `index.html`.
    nabudúce ten istý ťah trafí lepšie.
 2. **Paleta** (`Ctrl+K`) – všetky symboly podľa kategórií, plus hotové vzorce
    z fyziky a matematiky a jednotky sústavy SI.
-3. **Napovedanie slovenským slovom** – napíšeš `odmocnina` a stlačíš `Tab`,
-   vo vzorci je `√`. Funguje na `zlomok`, `integral`, `suma`, `nekonecno`,
-   `stupen`, `vektor`, `limita`, `derivacia`, `matica`, `nerovna`… – na názov
-   ktoréhokoľvek symbolu, s diakritikou aj bez nej. `Enter` si pritom necháva
+3. **Napovedanie slovom** – napíšeš `odmocnina` a stlačíš `Tab`, vo vzorci je `√`.
+   Funguje na `zlomok`, `integral`, `suma`, `nekonecno`, `stupen`, `vektor`,
+   `limita`, `derivacia`, `matica`, `nerovna`… – na názov ktoréhokoľvek symbolu,
+   s diakritikou aj bez nej, po slovensky aj po anglicky. Ponúkajú sa aj celé
+   šablóny: `pytagor` + `Tab` vloží `c^2 = a^2 + b^2`. `Enter` si pritom necháva
    svoj bežný význam, takže písanie viacriadkového výpočtu to neruší.
    V poznámkových riadkoch pod `#` okno nevyskakuje vôbec.
 4. **Spätná lomka** – napíšeš `\` a začneš písať názov príkazu; `\alp` → `\alpha`.
@@ -40,6 +41,17 @@ Stačí otvoriť `index.html`.
 **Skratky navyše**, aby sa fyzika písala kratšie:
 `\dd` (diferenciál d), `\unit{m}`, `\dv{y}{x}`, `\pdv{f}{x}`, `\abs{x}`, `\norm{v}`,
 `\grad`, `\divg`, `\curl`, `\ket{ψ}`, `\bra{ψ}`, `\braket{φ}{ψ}`, `\R \N \Z \Q \C`.
+
+**Odmocniny vyššieho stupňa** – stupeň sa píše do hranatých zátvoriek:
+`\sqrt[3]{8}` dá ∛8. V palete to nájdeš ako *Tretia odmocnina* alebo *n-tá odmocnina*.
+
+**Dva jazyky** – prepínač `SK` / `EN` v lište. Prepne sa celé rozhranie, názvy
+symbolov aj šablón. Hľadať a dopĺňať sa pritom dá v oboch jazykoch naraz, takže
+`odmocnina` funguje aj v anglickom režime a `root` v slovenskom.
+
+**Spätná väzba** – tlačidlo ☆ otvorí panel s hodnotením a poľom na text.
+*Odoslať cez GitHub* otvorí predvyplnenú stránku nového issue; rozpísaný text
+sa medzitým drží v prehliadači, takže sa nestratí.
 
 **Ukladanie** – plocha sa priebežne ukladá do prehliadača. Tlačidlom *Uložiť* si ju
 stiahneš ako `.json`, tlačidlom *Načítať* vrátiš späť.
@@ -124,6 +136,7 @@ npm test
 index.html            rozloženie stránky
 css/style.css         vzhľad
 js/symbols.js         databáza symbolov, šablón, vzorcov a makier
+js/i18n.js            slovenčina a angličtina, register slov na dopĺňanie
 js/recognizer.js      rozpoznávanie nakreslených symbolov
 js/app.js             plátno, bloky, paleta, napovedanie, ukladanie
 vendor/katex/         KaTeX 0.16.11 (MIT), aby appka fungovala aj offline

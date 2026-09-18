@@ -239,7 +239,104 @@ const undoDisabledAtStart = await page.evaluate(() => {
 });
 check('tlačidlo Späť je aktívne, keď je čo vrátiť', undoDisabledAtStart);
 
-/* 11. nápoveda ------------------------------------------------------ */
+/* 11. prepínanie jazyka -------------------------------------------- */
+await page.locator('.lang[data-lang="en"]').click();
+check('angličtina prepla lištu',
+  (await page.locator('.tool[data-tool="select"] i').textContent()) === 'Select');
+await page.locator('#btn-palette').click();
+await page.locator('#palette-search').fill('');
+await page.waitForTimeout(150);
+const enCat = await page.locator('#palette-body .cat-title').first().textContent();
+check('paleta má anglické kategórie', enCat === 'Greek letters', `kategória=${enCat}`);
+
+await page.locator('.lang[data-lang="sk"]').click();
+await page.waitForTimeout(150);
+check('slovenčina prepla lištu späť',
+  (await page.locator('.tool[data-tool="select"] i').textContent()) === 'Výber');
+const skCat = await page.locator('#palette-body .cat-title').first().textContent();
+check('paleta má slovenské kategórie', skCat === 'Grécke písmená', `kategória=${skCat}`);
+await page.locator('[data-close="palette"]').click();
+
+await page.reload();
+await page.waitForFunction(() => window.MW && window.MW.SYMBOLS);
+check('jazyk prežil obnovenie stránky',
+  (await page.locator('.tool[data-tool="select"] i').textContent()) === 'Výber');
+
+/* 12. šablóna cez slovo a tretia odmocnina -------------------------- */
+await page.locator('.block').first().locator('.render').click();
+await page.waitForSelector('.block.editing textarea');
+const ta2 = page.locator('.block.editing textarea');
+await ta2.press('Control+End');
+await ta2.type('\npytagor');
+await page.waitForSelector('#autocomplete:not([hidden])', { timeout: 3000 });
+await ta2.press('Tab');
+const pyt = await ta2.inputValue();
+check('slovo „pytagor" vložilo celý vzorec', pyt.includes('c^2 = a^2 + b^2'),
+  JSON.stringify(pyt.slice(-22)));
+
+await page.locator('#btn-palette').click();
+await page.locator('#palette-search').fill('odmocnina');
+await page.waitForTimeout(150);
+const snipLabels = await page.locator('#palette-body .snip .lbl').allTextContents();
+check('paleta ponúka tretiu odmocninu', snipLabels.includes('Tretia odmocnina'),
+  snipLabels.join(' / '));
+await page.locator('#palette-body .snip', { hasText: 'Tretia odmocnina' }).first().click();
+const cube = await page.locator('.block').first().locator('textarea').inputValue();
+check('tretia odmocnina sa vložila ako \\sqrt[3]{}', cube.includes('\\sqrt[3]{}'),
+  JSON.stringify(cube.slice(-16)));
+check('šablóna nevložila značku kurzora', !cube.includes('⟦'));
+await page.locator('[data-close="palette"]').click();
+
+/* 13. spätná väzba -------------------------------------------------- */
+await page.locator('#btn-feedback').click();
+await page.waitForSelector('#feedback:not([hidden])');
+await page.locator('.star[data-value="4"]').click();
+check('hodnotenie sa zapísalo',
+  (await page.locator('#fb-score').textContent()).trim() === '4 z 5',
+  await page.locator('#fb-score').textContent());
+check('svietia štyri hviezdy', (await page.locator('.star.on').count()) === 4);
+await page.locator('#fb-text').fill('Chýba mi tabuľka derivácií.');
+
+// GitHub z tohto prostredia nie je dostupný, tak požiadavku zachytíme
+// a odpovieme naň sami – zaujíma nás adresa, nie cieľová stránka.
+let issueUrl = '';
+await page.context().route('https://github.com/**', (route) => {
+  issueUrl = route.request().url();
+  return route.fulfill({ status: 200, contentType: 'text/html', body: 'ok' });
+});
+const [issue] = await Promise.all([
+  page.waitForEvent('popup'),
+  page.locator('#fb-send').click()
+]);
+await issue.waitForLoadState().catch(() => {});
+await issue.close();
+check('odoslanie otvorí predvyplnenú stránku na GitHube',
+  issueUrl.startsWith('https://github.com/JurajCyprich/Math-Workspace/issues/new') &&
+  decodeURIComponent(issueUrl).includes('deriv') &&
+  decodeURIComponent(issueUrl).includes('4/5'),
+  issueUrl.slice(0, 96) || '(žiadna požiadavka)');
+
+await page.reload();
+await page.waitForFunction(() => window.MW && window.MW.SYMBOLS);
+await page.locator('#btn-feedback').click();
+check('rozpísaná spätná väzba sa nestratila',
+  (await page.locator('#fb-text').inputValue()).includes('derivácií') &&
+  (await page.locator('.star.on').count()) === 4);
+await page.screenshot({ path: resolve(shots, '07-spatna-vazba.png') });
+
+// Pri align-items:center majú prvky rôzne „top", ale rovnaký stred,
+// takže riadky počítame podľa stredov.
+const barRows = await page.locator('.topbar').evaluate((bar) => {
+  const mids = [...bar.children].map((el) => {
+    const r = el.getBoundingClientRect();
+    return Math.round(r.top + r.height / 2);
+  });
+  return new Set(mids).size;
+});
+check('horná lišta sa vojde do jedného riadku', barRows === 1, `riadkov=${barRows}`);
+await page.locator('[data-close="feedback"]').click();
+
+/* 14. nápoveda ------------------------------------------------------ */
 await page.locator('#btn-help').click();
 await page.waitForSelector('#help:not([hidden])');
 await page.screenshot({ path: resolve(shots, '05-napoveda.png') });

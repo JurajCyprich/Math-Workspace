@@ -35,8 +35,8 @@ button, input { font: inherit; color: inherit; }
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 9px 14px;
+  gap: 10px;
+  padding: 9px 12px;
   padding-top: calc(9px + env(safe-area-inset-top, 0px));
   background: rgba(15, 18, 32, .92);
   backdrop-filter: blur(12px);
@@ -85,11 +85,61 @@ button, input { font: inherit; color: inherit; }
 }
 
 .toolgroup button span { font-size: 15px; line-height: 1; }
+.toolgroup button i { font-style: normal; }
 .toolgroup button:hover { background: var(--panel-2); color: var(--ink); }
 .toolgroup button.active { background: var(--accent); color: #0d1020; font-weight: 600; }
 .toolgroup button:disabled { opacity: .32; cursor: default; }
 .toolgroup button:disabled:hover { background: transparent; color: var(--muted); }
 #btn-undo, #btn-redo { font-size: 16px; padding: 6px 10px; }
+
+.langs button { padding: 6px 9px; font-size: 12px; font-weight: 600; letter-spacing: .5px; }
+
+/* ── spätná väzba ─────────────────────────────────────────────────── */
+
+.rating { display: flex; align-items: center; gap: 10px; }
+.rating-label { color: var(--muted); font-size: 12.5px; }
+.rating-score { color: var(--accent-2); font-size: 12.5px; }
+
+.stars { display: flex; gap: 2px; }
+
+.star {
+  background: transparent;
+  border: 0;
+  padding: 2px 3px;
+  font-size: 22px;
+  line-height: 1;
+  color: #3d4470;
+  cursor: pointer;
+  transition: color .12s, transform .12s;
+}
+
+.star:hover { transform: scale(1.14); }
+.star.on { color: #ffc75a; }
+.star:focus-visible { outline: 2px solid var(--accent); border-radius: 5px; }
+
+#fb-text {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#fb-text:focus { border-color: var(--accent); }
+
+.draw-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0d1020;
+  font-weight: 600;
+}
+
+.draw-actions button.primary:hover { filter: brightness(1.08); color: #0d1020; }
 .toolgroup button.accent { color: var(--accent-2); }
 .toolgroup button.accent:hover { background: rgba(61, 219, 217, .14); }
 
@@ -536,6 +586,28 @@ button, input { font: inherit; color: inherit; }
 ::-webkit-scrollbar { width: 9px; height: 9px; }
 ::-webkit-scrollbar-thumb { background: #3a4270; border-radius: 9px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* Na užších obrazovkách nechávame pri nástrojoch len ikony – ich význam
+   drží popis po nabehnutí myšou a lišta sa nezalomí do druhého riadku. */
+@media (max-width: 1540px) {
+  /* Skôr než popisy nástrojov obetujeme názov appky – ikony sú jasné,
+     ale „Výber" a „Guma" sa čítajú lepšie než samotné piktogramy. */
+  .brand .name { display: none; }
+  .toolgroup button { padding: 6px 9px; }
+}
+
+@media (max-width: 1240px) {
+  .tool i { display: none; }
+}
+
+@media (max-width: 1080px) {
+  #btn-draw i, #btn-palette i { display: none; }
+}
+
+@media (max-width: 860px) {
+  .brand i, .brand { font-size: 0; gap: 0; }
+  .brand .logo { font-size: 22px; }
+}
 
 @media (max-width: 720px) {
   .brand span:not(.logo), .toolgroup button span + * { }

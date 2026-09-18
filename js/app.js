@@ -61,7 +61,7 @@
   }
 
   function contentHtml(text, math) {
-    if (!text.trim()) return '<div class="empty">prázdny blok – klikni a píš</div>';
+    if (!text.trim()) return '<div class="empty">' + esc(MW.t('block.empty')) + '</div>';
     return text.split('\n').map(function (line) {
       if (!line.trim()) return '<div class="line">&nbsp;</div>';
       var t = line.trim();
@@ -110,10 +110,10 @@
     el.style.top = data.y + 'px';
     el.innerHTML =
       '<div class="block-bar">' +
-        '<button class="mode" title="Prepnúť: celý blok ako vzorec / text">∑</button>' +
+        '<button class="mode" data-i18n-title="block.mode.t">∑</button>' +
         '<span class="grip">⠿⠿⠿</span>' +
-        '<button class="dup" title="Duplikovať">⧉</button>' +
-        '<button class="del" title="Zmazať blok">×</button>' +
+        '<button class="dup" data-i18n-title="block.dup.t">⧉</button>' +
+        '<button class="del" data-i18n-title="block.del.t">×</button>' +
       '</div>' +
       '<div class="render"></div>' +
       '<textarea spellcheck="false" wrap="off"></textarea>';
@@ -170,8 +170,41 @@
 
     dragBar(el.querySelector('.block-bar'), data);
     world.appendChild(el);
+    translate(el);
     paint(data);
     return data;
+  }
+
+  /* ── jazyk ────────────────────────────────────────────────────────── */
+
+  // Preloží text, popisky a zástupné texty vnútri daného prvku.
+  function translate(root) {
+    root = root || document;
+    root.querySelectorAll('[data-i18n]').forEach(function (el) {
+      el.innerHTML = MW.t(el.dataset.i18n);
+    });
+    root.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+      el.title = MW.t(el.dataset.i18nTitle);
+    });
+    root.querySelectorAll('[data-i18n-ph]').forEach(function (el) {
+      el.placeholder = MW.t(el.dataset.i18nPh);
+    });
+    root.querySelectorAll('[data-i18n-aria]').forEach(function (el) {
+      el.setAttribute('aria-label', MW.t(el.dataset.i18nAria));
+    });
+  }
+
+  function applyLang(next) {
+    if (next) MW.setLang(next);
+    document.documentElement.lang = MW.lang();
+    MW.buildWords();
+    translate(document);
+    document.querySelectorAll('.lang').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.lang === MW.lang());
+    });
+    state.blocks.forEach(paint);
+    Palette.rebuild();
+    Draw.relabel();
   }
 
   function autosize(ta) {
@@ -305,6 +338,7 @@
 
   // Zo zápisu symbolu spraví to, čo sa má naozaj vložiť.
   function texToInsert(tex) {
+    if (tex.indexOf(CARET) >= 0) return tex;      // šablóna si značku nesie sama
     if (tex.indexOf('{}') >= 0) return tex.replace('{}', '{' + CARET + '}');
     if (/^\\[a-zA-Z]+$/.test(tex)) return tex + ' ';
     return tex;
@@ -389,7 +423,7 @@
           '<span class="ac-ch">' + esc(c.ch || '') + '</span>' +
           '<span class="ac-tex">' + esc(c.tex) + '</span>' +
           '<span class="ac-name">' + esc(c.name) + '</span></div>';
-      }).join('') + (mode === 'word' ? '<div class="ac-hint">Tab doplní symbol</div>' : '');
+      }).join('') + (mode === 'word' ? '<div class="ac-hint">' + esc(MW.t('ac.tab')) + '</div>' : '');
       var on = box.querySelector('.ac-item.on');
       if (on) on.scrollIntoView({ block: 'nearest' });
     }
@@ -612,13 +646,13 @@
 
     function symButton(s) {
       return '<button class="sym" data-tex="' + esc(s.tex) + '" title="' +
-        esc(s.name + '  ' + s.tex) + '">' + esc(s.ch) + '</button>';
+        esc(MW.symName(s) + '  ' + s.tex) + '">' + esc(s.ch) + '</button>';
     }
 
     function snipButton(label, tex) {
       var preview = renderMath(tex.replace(CARET, '\\square'), false);
       return '<button class="snip" data-tex="' + esc(tex) + '">' +
-        '<span class="lbl">' + esc(label) + '</span>' +
+        '<span class="lbl">' + esc(MW.snipLabel(label)) + '</span>' +
         '<span class="prev">' + preview + '</span></button>';
     }
 
@@ -627,39 +661,39 @@
       MW.CATEGORIES.forEach(function (cat) {
         var list = MW.SYMBOLS.filter(function (s) { return s.cat === cat.id; });
         if (!list.length) return;
-        html += '<div class="cat-title">' + esc(cat.label) + '</div><div class="sym-grid">' +
+        html += '<div class="cat-title">' + esc(MW.catLabel(cat.id)) + '</div><div class="sym-grid">' +
           list.map(symButton).join('') + '</div>';
       });
       MW.SNIPPETS.forEach(function (group) {
-        html += '<div class="cat-title">' + esc(group.label) + '</div><div class="snip-list">' +
+        html += '<div class="cat-title">' + esc(MW.groupLabel(group.label)) + '</div><div class="snip-list">' +
           group.items.map(function (it) { return snipButton(it[0], it[1]); }).join('') + '</div>';
       });
       body.innerHTML = html;
     }
 
+    // Hľadá sa v oboch jazykoch naraz, s diakritikou aj bez nej.
     function find(q) {
-      q = q.trim().toLowerCase();
+      q = MW.deaccent(q.trim());
       if (!q) return full();
       var syms = MW.SYMBOLS.filter(function (s) {
-        return s.name.toLowerCase().indexOf(q) >= 0 || s.kw.indexOf(q) >= 0 ||
-          s.tex.toLowerCase().indexOf(q) >= 0 || s.ch === q;
+        return MW.symSearch(s).indexOf(q) >= 0 || s.tex.toLowerCase().indexOf(q) >= 0 || s.ch === q;
       });
       var snips = [];
       MW.SNIPPETS.forEach(function (g) {
         g.items.forEach(function (it) {
-          if (it[0].toLowerCase().indexOf(q) >= 0 || it[1].toLowerCase().indexOf(q) >= 0) snips.push(it);
+          if (MW.snipSearch(it[0]).indexOf(q) >= 0 || it[1].toLowerCase().indexOf(q) >= 0) snips.push(it);
         });
       });
       var html = '';
       if (syms.length) {
-        html += '<div class="cat-title">Symboly</div><div class="sym-grid">' +
+        html += '<div class="cat-title">' + esc(MW.t('palette.symbols')) + '</div><div class="sym-grid">' +
           syms.map(symButton).join('') + '</div>';
       }
       if (snips.length) {
-        html += '<div class="cat-title">Vzorce a šablóny</div><div class="snip-list">' +
+        html += '<div class="cat-title">' + esc(MW.t('palette.formulas')) + '</div><div class="snip-list">' +
           snips.map(function (it) { return snipButton(it[0], it[1]); }).join('') + '</div>';
       }
-      body.innerHTML = html || '<div class="cat-title">Nič sa nenašlo</div>';
+      body.innerHTML = html || '<div class="cat-title">' + esc(MW.t('palette.none')) + '</div>';
     }
 
     body.addEventListener('mousedown', function (e) {
@@ -673,6 +707,7 @@
     search.addEventListener('input', function () { find(search.value); });
 
     return {
+      rebuild: function () { if (builtOnce) find(search.value); },
       show: function () {
         if (!builtOnce) { full(); builtOnce = true; }
         $('#palette').hidden = false;
@@ -749,7 +784,7 @@
 
     function hitHtml(tex, conf) {
       var s = byTex[tex];
-      var name = s ? s.name : tex;
+      var name = s ? MW.symName(s) : tex;
       var ch = s ? s.ch : '';
       var bar = conf == null ? '' :
         '<span class="bar" style="opacity:' + (0.25 + 0.75 * conf).toFixed(2) + '"></span>';
@@ -760,16 +795,17 @@
     }
 
     function recognise() {
-      if (!MW.Recognizer.ready) { status.textContent = 'pripravujem…'; return; }
+      if (!MW.Recognizer.ready) { status.textContent = MW.t('draw.preparing'); return; }
       var ink = strokes.filter(function (s) { return s.length; });
       if (!ink.length) { results.innerHTML = ''; return; }
       var hits = MW.Recognizer.recognize(ink, 8);
       if (!hits.length) {
-        results.innerHTML = '<span class="panel-note">Nič podobné. Skús to nakresliť väčšie.</span>';
+        results.innerHTML = '<span class="panel-note">' + esc(MW.t('draw.nothing')) + '</span>';
         return;
       }
       results.innerHTML = hits.map(function (h) { return hitHtml(h.tex, h.confidence); }).join('');
-      status.textContent = strokes.length + ' ' + (strokes.length === 1 ? 'ťah' : 'ťahy');
+      status.textContent = MW.t(strokes.length === 1 ? 'draw.strokes1' : 'draw.strokes',
+        { n: strokes.length });
     }
 
     function pick(tex) {
@@ -777,9 +813,9 @@
       var ink = strokes.filter(function (s) { return s.length > 1; });
       if (ink.length) {
         MW.Recognizer.learn(ink, tex);
-        toast('Vložené · rukopis zapamätaný');
+        toast(MW.t('toast.learned'));
       } else {
-        toast('Vložené');
+        toast(MW.t('toast.inserted'));
       }
       clear();
     }
@@ -795,11 +831,10 @@
     });
 
     searchBox.addEventListener('input', function () {
-      var q = searchBox.value.trim().toLowerCase();
+      var q = MW.deaccent(searchBox.value.trim());
       if (!q) { searchOut.innerHTML = ''; return; }
       searchOut.innerHTML = MW.SYMBOLS.filter(function (s) {
-        return s.name.toLowerCase().indexOf(q) >= 0 || s.kw.indexOf(q) >= 0 ||
-          s.tex.toLowerCase().indexOf(q) >= 0;
+        return MW.symSearch(s).indexOf(q) >= 0 || s.tex.toLowerCase().indexOf(q) >= 0;
       }).slice(0, 24).map(function (s) { return hitHtml(s.tex, null); }).join('');
     });
 
@@ -824,13 +859,98 @@
         $('#draw').hidden = false;
         fit();
         if (!MW.Recognizer.ready) {
-          status.textContent = 'pripravujem predlohy…';
+          status.textContent = MW.t('draw.preparing');
           MW.Recognizer.build().then(function (n) {
-            status.textContent = n + ' symbolov pripravených';
+            status.textContent = MW.t('draw.ready', { n: n });
           });
         }
       },
+      // Po zmene jazyka prepíšeme názvy vo výsledkoch, ktoré už visia na obrazovke.
+      relabel: function () {
+        if (strokes.length) recognise();
+        if (searchBox.value) searchBox.dispatchEvent(new Event('input'));
+      },
       clear: clear
+    };
+  })();
+
+  /* ── spätná väzba ─────────────────────────────────────────────────── */
+
+  var Feedback = (function () {
+    var REPO = 'https://github.com/JurajCyprich/Math-Workspace';
+    var KEY = 'mw:feedback:v1';
+    var stars = $('#fb-stars'), text = $('#fb-text'), score = $('#fb-score');
+    var rating = 0;
+
+    function paint() {
+      stars.querySelectorAll('.star').forEach(function (b) {
+        b.classList.toggle('on', Number(b.dataset.value) <= rating);
+        b.setAttribute('aria-checked', Number(b.dataset.value) === rating ? 'true' : 'false');
+      });
+      score.textContent = rating ? MW.t('fb.stars', { n: rating }) : '';
+    }
+
+    function remember() {
+      try {
+        localStorage.setItem(KEY, JSON.stringify({ rating: rating, text: text.value }));
+      } catch (e) { /* nevadí */ }
+    }
+
+    function recall() {
+      try {
+        var d = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (d) { rating = d.rating || 0; text.value = d.text || ''; }
+      } catch (e) { /* nevadí */ }
+      paint();
+    }
+
+    function body() {
+      var out = [];
+      if (rating) out.push(MW.t('fb.rating') + ': ' + rating + '/5');
+      out.push('', text.value.trim());
+      return out.join('\n');
+    }
+
+    stars.addEventListener('click', function (e) {
+      var b = e.target.closest('.star');
+      if (!b) return;
+      // Druhý klik na tú istú hviezdu hodnotenie zruší.
+      rating = (Number(b.dataset.value) === rating) ? 0 : Number(b.dataset.value);
+      paint();
+      remember();
+    });
+
+    text.addEventListener('input', remember);
+
+    $('#fb-send').addEventListener('click', function () {
+      if (!text.value.trim()) { toast(MW.t('fb.empty')); text.focus(); return; }
+      var title = text.value.trim().split('\n')[0].slice(0, 60);
+      window.open(REPO + '/issues/new?labels=feedback' +
+        '&title=' + encodeURIComponent(title) +
+        '&body=' + encodeURIComponent(body()), '_blank', 'noopener');
+    });
+
+    $('#fb-copy').addEventListener('click', function () {
+      if (!text.value.trim()) { toast(MW.t('fb.empty')); text.focus(); return; }
+      var done = function () { toast(MW.t('toast.copied')); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(body()).then(done, function () { fallback(); });
+      } else { fallback(); }
+
+      function fallback() {
+        text.select();
+        try { document.execCommand('copy'); done(); } catch (e) { /* nedá sa */ }
+      }
+    });
+
+    recall();
+
+    return {
+      show: function () {
+        $('#feedback').hidden = false;
+        paint();
+        text.focus();
+      }
     };
   })();
 
@@ -939,6 +1059,15 @@
     if (p.hidden) Draw.show(); else p.hidden = true;
   });
 
+  $('#btn-feedback').addEventListener('click', function () {
+    var p = $('#feedback');
+    if (p.hidden) Feedback.show(); else p.hidden = true;
+  });
+
+  document.querySelectorAll('.lang').forEach(function (b) {
+    b.addEventListener('click', function () { applyLang(b.dataset.lang); });
+  });
+
   $('#btn-help').addEventListener('click', function () { $('#help').hidden = false; });
   $('#btn-zoom-in').addEventListener('click', function () { zoomAt(innerWidth / 2, innerHeight / 2, 1.2); });
   $('#btn-zoom-out').addEventListener('click', function () { zoomAt(innerWidth / 2, innerHeight / 2, 1 / 1.2); });
@@ -955,7 +1084,7 @@
     a.download = 'math-workspace-' + new Date().toISOString().slice(0, 10) + '.json';
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-    toast('Uložené do súboru');
+    toast(MW.t('toast.saved'));
   });
 
   $('#btn-import').addEventListener('click', function () { $('#file-input').click(); });
@@ -971,9 +1100,9 @@
         commitStep();
         load(parsed);
         save();
-        toast('Načítané');
+        toast(MW.t('toast.loaded'));
       } catch (err) {
-        toast('Súbor sa nepodarilo prečítať');
+        toast(MW.t('toast.badFile'));
       }
     };
     reader.readAsText(file);
@@ -981,12 +1110,12 @@
   });
 
   $('#btn-clear').addEventListener('click', function () {
-    if (!confirm('Naozaj vyprázdniť celú plochu?')) return;
+    if (!confirm(MW.t('confirm.clear'))) return;
     beginStep();
     commitStep();
     load({ view: { x: 0, y: 0, k: 1 }, blocks: [], strokes: [] });
     save();
-    toast('Plocha vyprázdnená · Ctrl+Z to vráti');
+    toast(MW.t('toast.cleared'));
   });
 
   $('#btn-undo').addEventListener('click', function () { step(past, futureSteps); });
@@ -998,6 +1127,7 @@
     if (e.key === 'Escape') {
       $('#palette').hidden = true;
       $('#draw').hidden = true;
+      $('#feedback').hidden = true;
       $('#help').hidden = true;
       return;
     }
@@ -1049,38 +1179,20 @@
     if (saved && saved.blocks && saved.blocks.length) {
       load(saved);
     } else {
+      var seed = MW.seedTexts();
       load({
         view: { x: 0, y: 0, k: 1 },
         blocks: [
-          {
-            x: 90, y: 130, math: true, text:
-              '# Kvadratická rovnica\n' +
-              '2x^2 - 5x + 3 = 0\n' +
-              'D = b^2 - 4ac = 25 - 24 = 1\n' +
-              'x_{1,2} = \\frac{-b \\pm \\sqrt{D}}{2a} = \\frac{5 \\pm 1}{4}\n' +
-              'x_1 = \\frac{3}{2} \\quad x_2 = 1'
-          },
-          {
-            x: 90, y: 430, math: true, text:
-              '# Voľný pád – skús to prepísať\n' +
-              'v = g t \\qquad s = \\tfrac{1}{2} g t^2\n' +
-              'E_k = \\tfrac{1}{2} m v^2 = \\unit{J}\n' +
-              '# Napíš \\ a začni písať názov symbolu'
-          },
-          {
-            x: 560, y: 130, math: true, text:
-              '# Symboly, čo nie sú na klávesnici\n' +
-              '\\int_{0}^{\\pi} \\sin x \\dd x = 2\n' +
-              '\\nabla \\cdot \\vec{E} = \\frac{\\rho}{\\varepsilon_0}\n' +
-              '\\hbar \\omega \\approx 2{,}5 \\unit{eV}\n' +
-              '# Nakresli ich myšou – tlačidlo „Nakresliť symbol"'
-          }
+          { x: 90, y: 130, math: true, text: seed[0] },
+          { x: 90, y: 430, math: true, text: seed[1] },
+          { x: 560, y: 130, math: true, text: seed[2] }
         ],
         strokes: []
       });
     }
 
     setTool('select');
+    applyLang();
     applyView();
     refreshSteps();
 
