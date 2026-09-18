@@ -24,6 +24,7 @@
   <div class="toolgroup">
     <button id="btn-draw" class="accent" data-i18n-title="btn.draw.t"><span>✍</span><i data-i18n="btn.draw">Nakresliť symbol</i></button>
     <button id="btn-palette" data-i18n-title="btn.palette.t"><span>Ω</span><i data-i18n="btn.palette">Symboly</i></button>
+    <button id="btn-calc" data-i18n-title="btn.calc.t"><span>=</span><i data-i18n="btn.calc">Kalkulačka</i></button>
   </div>
 
   <div class="toolgroup">
@@ -88,6 +89,40 @@
   <div id="draw-search-results" class="results"></div>
 </aside>
 
+<!-- Kalkulačka -->
+<aside id="calc" class="panel" hidden>
+  <div class="panel-head">
+    <strong data-i18n="calc.title">Kalkulačka</strong>
+    <button class="close" data-close="calc">×</button>
+  </div>
+  <p class="panel-note" data-i18n="calc.note"></p>
+
+  <input id="calc-input" type="text" spellcheck="false" autocomplete="off" data-i18n-ph="calc.ph">
+  <div id="calc-result" class="calc-result"></div>
+
+  <div id="calc-keys" class="keys">
+    <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+    <button data-key="\div " class="op">÷</button><button data-key="(">(</button>
+    <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+    <button data-key="\cdot " class="op">·</button><button data-key=")">)</button>
+    <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+    <button data-key="-" class="op">−</button><button data-key="^" class="op">x<sup>y</sup></button>
+    <button data-key="0">0</button><button data-key="{,}">,</button><button data-key="\pi ">π</button>
+    <button data-key="+" class="op">+</button><button data-key="\sqrt{}" class="op">√</button>
+    <button data-key="\frac{}{}" class="op">a/b</button>
+    <button data-key="\sin()" class="op">sin</button>
+    <button data-key="\cos()" class="op">cos</button>
+    <button id="calc-back" class="op">⌫</button>
+    <button id="calc-clear" class="op">C</button>
+  </div>
+
+  <div class="draw-actions">
+    <button id="calc-insert" class="primary" data-i18n="calc.insert">Vložiť do plochy</button>
+    <button id="calc-forget" data-i18n="calc.clearHistory">Vymazať históriu</button>
+  </div>
+  <div id="calc-history" class="results"></div>
+</aside>
+
 <!-- Spätná väzba -->
 <aside id="feedback" class="panel" hidden>
   <div class="panel-head">
@@ -143,6 +178,7 @@
           <li data-i18n="help.writing.5"></li>
           <li data-i18n="help.writing.6"></li>
           <li data-i18n="help.writing.7"></li>
+          <li data-i18n="help.writing.8"></li>
         </ul>
       </section>
       <section>
@@ -175,6 +211,7 @@
 <script src="vendor/katex/katex.min.js"></script>
 <script src="js/symbols.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/calc.js"></script>
 <script src="js/recognizer.js"></script>
 <script src="js/app.js"></script>
 </body>

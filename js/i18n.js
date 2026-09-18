@@ -64,6 +64,20 @@ window.MW = window.MW || {};
 
     'ac.tab': ['Tab doplní symbol', 'Tab inserts the symbol'],
 
+    'btn.calc.t': ['Kalkulačka (Ctrl+E)', 'Calculator (Ctrl+E)'],
+    'btn.calc': ['Kalkulačka', 'Calculator'],
+    'calc.title': ['Kalkulačka', 'Calculator'],
+    'calc.note': ['Píš to ako do vzorca – zlomky, odmocniny, π aj uhly v stupňoch.',
+      'Type it the way you write a formula – fractions, roots, π and angles in degrees.'],
+    'calc.ph': ['napr. \\frac{5+1}{4}', 'e.g. \\frac{5+1}{4}'],
+    'calc.insert': ['Vložiť do plochy', 'Insert into the canvas'],
+    'calc.history': ['História', 'History'],
+    'calc.clearHistory': ['Vymazať históriu', 'Clear history'],
+    'calc.bad': ['Toto sa vyčísliť nedá', 'This cannot be evaluated'],
+    'calc.empty': ['Najprv napíš výraz.', 'Write an expression first.'],
+    'calc.line.t': ['Dopočítať výsledok', 'Work out the result'],
+    'toast.calc': ['Výsledok dopísaný', 'Result added'],
+
     'toast.inserted': ['Vložené', 'Inserted'],
     'toast.learned': ['Vložené · rukopis zapamätaný', 'Inserted · handwriting remembered'],
     'toast.saved': ['Uložené do súboru', 'Saved to a file'],
@@ -107,6 +121,8 @@ window.MW = window.MW || {};
       'Or type <code>\\</code> and start typing a command name'],
     'help.writing.7': ['Odmocnina so stupňom: <code>\\sqrt[3]{8}</code> dá ∛8',
       'Root with a degree: <code>\\sqrt[3]{8}</code> gives ∛8'],
+    'help.writing.8': ['Pri riadku, ktorý sa dá vyčísliť, sa vpravo ukáže <b>=</b> – klikni a výsledok sa dopíše',
+      'A line that can be worked out shows <b>=</b> on the right – click it and the result is added'],
 
     'help.symbols': ['Symboly, ktoré nie sú na klávesnici', 'Symbols that are not on the keyboard'],
     'help.symbols.1': ['<b>Nakresliť symbol</b> – nakresli ho myšou, appka ponúkne zhody',

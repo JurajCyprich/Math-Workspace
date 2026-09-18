@@ -287,6 +287,73 @@ check('tretia odmocnina sa vložila ako \\sqrt[3]{}', cube.includes('\\sqrt[3]{}
 check('šablóna nevložila značku kurzora', !cube.includes('⟦'));
 await page.locator('[data-close="palette"]').click();
 
+/* 12b. kalkulačka ---------------------------------------------------- */
+await page.locator('#btn-calc').click();
+await page.waitForSelector('#calc:not([hidden])');
+await page.locator('#calc-input').fill('\\frac{5+1}{4}');
+await page.waitForTimeout(120);
+check('kalkulačka počíta priebežne',
+  (await page.locator('#calc-result').textContent()).includes('1,5'),
+  await page.locator('#calc-result').textContent());
+
+await page.locator('#calc-input').fill('2x + 1');
+await page.waitForTimeout(120);
+check('pri premennej kalkulačka nehádže výsledok',
+  (await page.locator('#calc-result')).evaluate ? await page.locator('#calc-result').evaluate(
+    (el) => el.classList.contains('bad')) : false);
+
+// číselník vkladá na miesto kurzora a skáče do zátvorky
+await page.locator('#calc-input').fill('');
+await page.locator('#calc-keys button[data-key="\\\\sqrt{}"]').click();
+await page.locator('#calc-keys button[data-key="9"]').click();
+check('číselník vložil odmocninu a kurzor skočil dovnútra',
+  (await page.locator('#calc-input').inputValue()) === '\\sqrt{9}',
+  await page.locator('#calc-input').inputValue());
+await page.waitForTimeout(120);
+check('výsledok z číselníka sedí',
+  (await page.locator('#calc-result').textContent()).includes('3'));
+
+await page.locator('#calc-input').press('Enter');
+await page.waitForTimeout(120);
+check('história si výpočet zapamätala',
+  (await page.locator('#calc-history .hit').count()) === 1,
+  `položiek=${await page.locator('#calc-history .hit').count()}`);
+
+const beforeInsert = await page.locator('.block').first().locator('textarea').inputValue();
+await page.locator('#calc-insert').click();
+const afterInsert = await page.locator('.block').first().locator('textarea').inputValue();
+check('vloženie z kalkulačky dopísalo výraz aj výsledok',
+  afterInsert.includes('\\sqrt{9} = 3') && afterInsert.length > beforeInsert.length,
+  JSON.stringify(afterInsert.slice(-18)));
+await page.screenshot({ path: resolve(shots, '08-kalkulacka.png') });
+await page.locator('[data-close="calc"]').click();
+
+/* 12c. dopočítanie riadku v bloku ----------------------------------- */
+const calcBlock = page.locator('.block').first();
+await calcBlock.locator('.render').click();
+await page.waitForSelector('.block.editing textarea');
+const ta3 = page.locator('.block.editing textarea');
+await ta3.press('Control+End');
+await ta3.type('\n25 - 24 =');
+await page.waitForTimeout(150);
+
+const calcButtons = await calcBlock.locator('.calc-line').count();
+check('riadok na dopočítanie dostal tlačidlo', calcButtons >= 1, `tlačidiel=${calcButtons}`);
+await calcBlock.locator('.calc-line').last().hover();
+await page.screenshot({ path: resolve(shots, '09-dopocitat.png') });
+
+await calcBlock.locator('.calc-line').last().click();
+await page.waitForTimeout(150);
+const solved = await calcBlock.locator('textarea').inputValue();
+check('kliknutie dopísalo výsledok', /25 - 24 = 1$/.test(solved.trim()),
+  JSON.stringify(solved.slice(-14)));
+check('dvojité „=" sa nezdvojilo', !solved.includes('= = '));
+
+await page.waitForTimeout(150);
+const stillOffered = await calcBlock.locator('.calc-line').count();
+check('hotový riadok už tlačidlo neponúka', stillOffered === calcButtons - 1,
+  `pred=${calcButtons} po=${stillOffered}`);
+
 /* 13. spätná väzba -------------------------------------------------- */
 await page.locator('#btn-feedback').click();
 await page.waitForSelector('#feedback:not([hidden])');

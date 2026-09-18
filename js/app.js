@@ -60,16 +60,23 @@
     return out;
   }
 
+  function decimalComma() { return MW.lang() !== 'en'; }
+
   function contentHtml(text, math) {
     if (!text.trim()) return '<div class="empty">' + esc(MW.t('block.empty')) + '</div>';
-    return text.split('\n').map(function (line) {
+    return text.split('\n').map(function (line, i) {
       if (!line.trim()) return '<div class="line">&nbsp;</div>';
       var t = line.trim();
       if (t.charAt(0) === '#') {
         return '<div class="line textline">' + mixedLine(t.replace(/^#\s?/, '')) + '</div>';
       }
-      if (math) return '<div class="line">' + renderMath(line, true) + '</div>';
-      return '<div class="line textline">' + mixedLine(line) + '</div>';
+      if (!math) return '<div class="line textline">' + mixedLine(line) + '</div>';
+
+      // Riadok, ktorý sa dá vyčísliť, dostane tlačidlo na dopočítanie.
+      var can = MW.Calc.lineResult(line, decimalComma()) !== null;
+      return '<div class="line">' + renderMath(line, true) +
+        (can ? '<button class="calc-line" data-line="' + i + '" title="' +
+          esc(MW.t('calc.line.t')) + '">=</button>' : '') + '</div>';
     }).join('');
   }
 
@@ -140,7 +147,15 @@
 
     el.querySelector('.render').addEventListener('mousedown', function (e) {
       e.stopPropagation();
+      // Klik na „=" nemá otvárať úpravu, len dopočítať riadok.
+      var calcBtn = e.target.closest('.calc-line');
+      if (calcBtn) { e.preventDefault(); return; }
       startEdit(data);
+    });
+
+    el.querySelector('.render').addEventListener('click', function (e) {
+      var calcBtn = e.target.closest('.calc-line');
+      if (calcBtn) solveLine(data, Number(calcBtn.dataset.line));
     });
 
     el.addEventListener('mousedown', function () { select(data); });
@@ -205,6 +220,24 @@
     state.blocks.forEach(paint);
     Palette.rebuild();
     Draw.relabel();
+    Calculator.relabel();
+  }
+
+  // Dopíše výsledok na koniec riadku. Prázdne „=" na konci nezdvojujeme.
+  function solveLine(data, index) {
+    var lines = data.text.split('\n');
+    var result = MW.Calc.lineResult(lines[index], decimalComma());
+    if (result === null) return;
+
+    beginStep();
+    commitStep();
+    lines[index] = lines[index].replace(/\s*=\s*$/, '') + ' = ' + result;
+    data.text = lines.join('\n');
+    data.ta.value = data.text;
+    autosize(data.ta);
+    paint(data);
+    save();
+    toast(MW.t('toast.calc'));
   }
 
   function autosize(ta) {
@@ -874,6 +907,119 @@
     };
   })();
 
+  /* ── kalkulačka ───────────────────────────────────────────────────── */
+
+  var Calculator = (function () {
+    var KEY = 'mw:calc-history:v1';
+    var input = $('#calc-input'), out = $('#calc-result'), list = $('#calc-history');
+    var history = [];
+
+    try { history = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { history = []; }
+
+    function value() {
+      var v = MW.Calc.evaluate(input.value);
+      return v === null ? null : MW.Calc.format(v, decimalComma());
+    }
+
+    function show() {
+      var r = value();
+      if (!input.value.trim()) { out.innerHTML = ''; out.classList.remove('bad'); return; }
+      out.classList.toggle('bad', r === null);
+      out.innerHTML = r === null
+        ? esc(MW.t('calc.bad'))
+        : '= ' + renderMath(r, false);
+    }
+
+    function drawHistory() {
+      list.innerHTML = history.map(function (h) {
+        return '<button class="hit" data-expr="' + esc(h.expr) + '">' +
+          '<span class="meta"><span class="nm">' + renderMath(h.expr, false) + '</span>' +
+          '<span class="tx">= ' + esc(h.result) + '</span></span></button>';
+      }).join('');
+    }
+
+    function remember(expr, result) {
+      history = history.filter(function (h) { return h.expr !== expr; });
+      history.unshift({ expr: expr, result: result });
+      history = history.slice(0, 10);
+      try { localStorage.setItem(KEY, JSON.stringify(history)); } catch (e) { /* nevadí */ }
+      drawHistory();
+    }
+
+    // Klávesa z číselníka sa vloží na miesto kurzora; ak má zátvorky,
+    // kurzor skočí dovnútra.
+    function type(text) {
+      var at = input.selectionStart, end = input.selectionEnd;
+      var open = text.search(/[({]/);
+      var caret = open >= 0 ? open + 1 : text.length;
+      input.value = input.value.slice(0, at) + text + input.value.slice(end);
+      input.focus();
+      input.setSelectionRange(at + caret, at + caret);
+      show();
+    }
+
+    input.addEventListener('input', show);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    });
+
+    function commit() {
+      var r = value();
+      if (r === null) { toast(MW.t(input.value.trim() ? 'calc.bad' : 'calc.empty')); return null; }
+      remember(input.value.trim(), r);
+      return r;
+    }
+
+    $('#calc-keys').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      if (b.id === 'calc-clear') { input.value = ''; show(); input.focus(); return; }
+      if (b.id === 'calc-back') {
+        var at = input.selectionStart;
+        if (at > 0) {
+          input.value = input.value.slice(0, at - 1) + input.value.slice(input.selectionEnd);
+          input.focus();
+          input.setSelectionRange(at - 1, at - 1);
+          show();
+        }
+        return;
+      }
+      if (b.dataset.key) type(b.dataset.key);
+    });
+
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-expr]');
+      if (!b) return;
+      input.value = b.dataset.expr;
+      show();
+      input.focus();
+    });
+
+    $('#calc-forget').addEventListener('click', function () {
+      history = [];
+      try { localStorage.removeItem(KEY); } catch (e) { /* nevadí */ }
+      drawHistory();
+    });
+
+    $('#calc-insert').addEventListener('click', function () {
+      var r = commit();
+      if (r === null) return;
+      insertText(input.value.trim() + ' = ' + r);
+      toast(MW.t('toast.inserted'));
+    });
+
+    return {
+      show: function () {
+        $('#calc').hidden = false;
+        drawHistory();
+        show();
+        input.focus();
+        input.select();
+      },
+      relabel: function () { show(); drawHistory(); }
+    };
+  })();
+
   /* ── spätná väzba ─────────────────────────────────────────────────── */
 
   var Feedback = (function () {
@@ -1059,6 +1205,11 @@
     if (p.hidden) Draw.show(); else p.hidden = true;
   });
 
+  $('#btn-calc').addEventListener('click', function () {
+    var p = $('#calc');
+    if (p.hidden) Calculator.show(); else p.hidden = true;
+  });
+
   $('#btn-feedback').addEventListener('click', function () {
     var p = $('#feedback');
     if (p.hidden) Feedback.show(); else p.hidden = true;
@@ -1127,6 +1278,7 @@
     if (e.key === 'Escape') {
       $('#palette').hidden = true;
       $('#draw').hidden = true;
+      $('#calc').hidden = true;
       $('#feedback').hidden = true;
       $('#help').hidden = true;
       return;
@@ -1150,6 +1302,11 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       Palette.show();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      Calculator.show();
       return;
     }
     if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;

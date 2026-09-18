@@ -42,6 +42,20 @@ Stačí otvoriť `index.html`.
 `\dd` (diferenciál d), `\unit{m}`, `\dv{y}{x}`, `\pdv{f}{x}`, `\abs{x}`, `\norm{v}`,
 `\grad`, `\divg`, `\curl`, `\ket{ψ}`, `\bra{ψ}`, `\braket{φ}{ψ}`, `\R \N \Z \Q \C`.
 
+**Počítanie** – dve cesty:
+- **Priamo v bloku**: pri riadku, ktorý sa dá vyčísliť, sa vpravo ukáže `=`.
+  Klikneš a výsledok sa dopíše na koniec riadku. Pri riadku s premennou,
+  jednotkou alebo už hotovým výsledkom sa tlačidlo neponúka vôbec.
+- **Kalkulačka** (`Ctrl+E`) – panel s číselníkom, priebežným výsledkom
+  a históriou posledných desiatich výpočtov.
+
+Výraz sa píše tak, ako sa píše vzorec: `\frac{5+1}{4}`, `\sqrt[3]{8}`, `2\pi`,
+`\sin(30^\circ)`, `\log_{2}{8}`, `1{,}5`. Desatinná čiarka aj bodka fungujú a
+výsledok sa vypíše podľa zvoleného jazyka.
+
+Vyhodnocovanie má vlastný tokenizer a parser (`js/calc.js`) – zámerne **nie**
+`eval()`. Do plochy sa dá napísať čokoľvek a nič z toho sa nesmie spustiť ako kód.
+
 **Odmocniny vyššieho stupňa** – stupeň sa píše do hranatých zátvoriek:
 `\sqrt[3]{8}` dá ∛8. V palete to nájdeš ako *Tretia odmocnina* alebo *n-tá odmocnina*.
 
@@ -128,6 +142,7 @@ npm test
 - `tests/ui.test.mjs` – preklikanie appky v prehliadači: vykreslenie vzorcov,
   napovedanie po `\`, paleta, kreslenie symbolu myšou, pero, guma, uloženie
   a obnova po obnovení stránky. Priebežne ukladá snímky do `tests/screenshots/`.
+- `tests/calc.test.mjs` – vyhodnocovač výrazov, beží priamo v Node.
 - `npm run test:bundle` – to isté preklikanie, ale na zlepenom jednom súbore.
 
 ## Štruktúra
@@ -137,6 +152,7 @@ index.html            rozloženie stránky
 css/style.css         vzhľad
 js/symbols.js         databáza symbolov, šablón, vzorcov a makier
 js/i18n.js            slovenčina a angličtina, register slov na dopĺňanie
+js/calc.js            vyhodnocovanie výrazov (vlastný parser, žiadny eval)
 js/recognizer.js      rozpoznávanie nakreslených symbolov
 js/app.js             plátno, bloky, paleta, napovedanie, ukladanie
 vendor/katex/         KaTeX 0.16.11 (MIT), aby appka fungovala aj offline
