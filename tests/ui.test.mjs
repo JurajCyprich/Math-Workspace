@@ -59,6 +59,43 @@ const [val, caret] = await ta.evaluate((el) => [el.value, el.selectionStart]);
 check('\\frac sa vložil aj so zátvorkami', val.includes('\\frac{}{}'), JSON.stringify(val.slice(-12)));
 check('kurzor skočil do prvej zátvorky', val[caret - 1] === '{' && val[caret] === '}', `caret=${caret}`);
 
+/* 2b. napovedanie zo slovenského slova ------------------------------ */
+await ta.press('Control+End');
+await ta.type('\nodmocnina');
+await page.waitForSelector('#autocomplete:not([hidden])', { timeout: 3000 });
+const wordFirst = await page.locator('.ac-item.on .ac-tex').textContent();
+check('slovo „odmocnina" ponúklo \\sqrt', wordFirst === '\\sqrt{}', `ponuka=${wordFirst}`);
+check('pri slovách je vidieť, že dopĺňa Tab',
+  (await page.locator('.ac-hint').count()) === 1);
+await page.screenshot({ path: resolve(shots, '06-slovo.png') });
+
+await ta.press('Tab');
+const afterWord = await ta.inputValue();
+check('Tab nahradil slovo symbolom', /\\sqrt\{\}$/.test(afterWord), JSON.stringify(afterWord.slice(-14)));
+check('slovo v zdroji nezostalo', !afterWord.includes('odmocnina'));
+
+// bez diakritiky aj s ňou musí ísť to isté
+await ta.type('\nintegral');
+await page.waitForSelector('#autocomplete:not([hidden])');
+const noDia = await page.locator('.ac-item.on .ac-tex').textContent();
+check('„integral" bez diakritiky nájde integrál', noDia === '\\int', `ponuka=${noDia}`);
+
+// Enter pri slove robí nový riadok, nie doplnenie
+// (kurzor je vnútri \sqrt{}, takže riadok pribudne tam, nie na konci)
+const beforeEnter = await ta.inputValue();
+await ta.press('Enter');
+const afterEnter = await ta.inputValue();
+check('Enter pri slove urobí nový riadok, nedopĺňa',
+  afterEnter.length === beforeEnter.length + 1 && afterEnter.includes('integral'),
+  JSON.stringify(afterEnter.slice(-12)));
+
+// v poznámkovom riadku pod „#" sa okno nesmie otvárať
+await ta.type('# vypocitaj odmocninu');
+await page.waitForTimeout(150);
+check('v poznámke pod „#" napovedanie mlčí',
+  await page.locator('#autocomplete').isHidden());
+await ta.press('Control+End');
+
 /* 3. paleta symbolov ----------------------------------------------- */
 await page.locator('#btn-palette').click();
 await page.waitForSelector('#palette:not([hidden])');

@@ -281,6 +281,11 @@ window.MW = window.MW || {};
     }
   ];
 
+  // „odmocnina" aj „odmocnína" aj „ODMOCNINA" má nájsť to isté.
+  MW.deaccent = function (s) {
+    return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  };
+
   // Vlastné makrá pre KaTeX – skratky, ktoré sa v bežnom LaTeXu píšu zdĺhavo.
   MW.MACROS = {
     '\\dd': '\\,\\mathrm{d}',
@@ -345,4 +350,20 @@ window.MW = window.MW || {};
     { tex: '\\ket', name: 'ket |ψ⟩', kw: 'ket kvantova', ch: '' },
     { tex: '\\bra', name: 'bra ⟨ψ|', kw: 'bra kvantova', ch: '' }
   ]);
+
+  // Register slov: k symbolu sa dá dostať aj napísaním jeho slovenského názvu,
+  // bez spätnej lomky. Stavia sa zo symbolov aj z príkazov, symboly majú prednosť.
+  MW.WORDS = (function () {
+    var out = [], seen = Object.create(null);
+    function add(tex, name, kw, ch) {
+      // \sqrt{} a \sqrt je ten istý príkaz – v ponuke má byť raz.
+      var key = tex.replace(/\{\}/g, '');
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({ tex: tex, name: name, ch: ch || '', search: MW.deaccent(name + ' ' + (kw || '')) });
+    }
+    MW.SYMBOLS.forEach(function (s) { add(s.tex, s.name, s.kw, s.ch); });
+    MW.COMMANDS.forEach(function (c) { add(c.tex, c.name, c.kw, c.ch); });
+    return out;
+  })();
 })();

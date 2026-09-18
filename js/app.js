@@ -150,7 +150,7 @@
       data.text = ta.value;
       autosize(ta);
       paint(data);
-      Autocomplete.update(ta);
+      Autocomplete.update(ta, data.math !== false);
       save();
     });
     ta.addEventListener('focus', function () {
@@ -166,7 +166,7 @@
       paint(data);
     });
     ta.addEventListener('keydown', function (e) { onEditorKey(e, data, ta); });
-    ta.addEventListener('click', function () { Autocomplete.update(ta); });
+    ta.addEventListener('click', function () { Autocomplete.update(ta, data.math !== false); });
 
     dragBar(el.querySelector('.block-bar'), data);
     world.appendChild(el);
@@ -333,8 +333,20 @@
 
   var Autocomplete = (function () {
     var box = $('#autocomplete');
-    var items = [], idx = 0, anchor = null, from = 0;
+    var items = [], idx = 0, anchor = null, from = 0, mode = 'cmd';
     var api = { busy: false };
+
+    /* Zhoda so slovenským názvom symbolu – bez spätnej lomky.
+     * Berieme len začiatky slov, aby „ka" nenašlo „odmocnina". */
+    function wordMatches(q) {
+      var n = MW.deaccent(q), starts = [], inside = [];
+      for (var i = 0; i < MW.WORDS.length; i++) {
+        var w = MW.WORDS[i], at = w.search.indexOf(n);
+        if (at === 0) starts.push(w);
+        else if (at > 0 && w.search.charAt(at - 1) === ' ') inside.push(w);
+      }
+      return starts.concat(inside).slice(0, 8);
+    }
 
     function candidates(q) {
       var lower = q.toLowerCase(), starts = [], contains = [];
@@ -377,19 +389,32 @@
           '<span class="ac-ch">' + esc(c.ch || '') + '</span>' +
           '<span class="ac-tex">' + esc(c.tex) + '</span>' +
           '<span class="ac-name">' + esc(c.name) + '</span></div>';
-      }).join('');
+      }).join('') + (mode === 'word' ? '<div class="ac-hint">Tab doplní symbol</div>' : '');
       var on = box.querySelector('.ac-item.on');
       if (on) on.scrollIntoView({ block: 'nearest' });
     }
 
-    api.update = function (ta) {
+    api.update = function (ta, mathMode) {
       var before = ta.value.slice(0, ta.selectionStart);
       var m = /\\([a-zA-Z]*)$/.exec(before);
-      if (!m) return api.hide();
-      items = candidates(m[1]);
+
+      if (m) {
+        mode = 'cmd';
+        from = m.index;
+        items = candidates(m[1]);
+      } else {
+        // Slová ponúkame len vo vzorcových riadkoch – v poznámke pod „#"
+        // by okno vyskakovalo pri každom druhom slove.
+        var line = before.slice(before.lastIndexOf('\n') + 1);
+        var w = (mathMode && !/^\s*#/.test(line)) ? /([a-zA-ZÀ-ž]{3,})$/.exec(before) : null;
+        if (!w) return api.hide();
+        mode = 'word';
+        from = w.index;
+        items = wordMatches(w[1]);
+      }
+
       if (!items.length) return api.hide();
       anchor = ta;
-      from = m.index;
       idx = 0;
       draw();
       var p = caretPoint(ta);
@@ -422,9 +447,11 @@
       if (box.hidden) return false;
       if (e.key === 'ArrowDown') { idx = (idx + 1) % items.length; draw(); e.preventDefault(); return true; }
       if (e.key === 'ArrowUp') { idx = (idx - 1 + items.length) % items.length; draw(); e.preventDefault(); return true; }
-      if (e.key === 'Enter' || e.key === 'Tab') {
+      // Pri slovách si Enter necháva svoj bežný význam – nový riadok výpočtu.
+      if (e.key === 'Tab' || (e.key === 'Enter' && mode === 'cmd')) {
         if (api.accept()) { e.preventDefault(); return true; }
       }
+      if (e.key === 'Enter') { api.hide(); return false; }
       if (e.key === 'Escape') { api.hide(); e.preventDefault(); e.stopPropagation(); return true; }
       return false;
     };

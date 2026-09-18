@@ -22,13 +22,19 @@ Stačí otvoriť `index.html`.
 - Blok sa dá prepnúť do textového režimu, kde je matematika medzi `$…$`.
 - Sadzba je cez [KaTeX](https://katex.org/) (priložený v `vendor/`, funguje offline).
 
-**Symboly, ktoré nie sú na klávesnici** – tri spôsoby:
+**Symboly, ktoré nie sú na klávesnici** – štyri spôsoby:
 1. **Nakresliť symbol** – nakreslíš znak myšou alebo prstom a appka ponúkne, čo to
    podľa nej je. Keď si zo zoznamu vyberieš, tvoj rukopis si **zapamätá**, takže
    nabudúce ten istý ťah trafí lepšie.
 2. **Paleta** (`Ctrl+K`) – všetky symboly podľa kategórií, plus hotové vzorce
    z fyziky a matematiky a jednotky sústavy SI.
-3. **Napovedanie** – napíšeš `\` a začneš písať názov; `\alp` → `\alpha`.
+3. **Napovedanie slovenským slovom** – napíšeš `odmocnina` a stlačíš `Tab`,
+   vo vzorci je `√`. Funguje na `zlomok`, `integral`, `suma`, `nekonecno`,
+   `stupen`, `vektor`, `limita`, `derivacia`, `matica`, `nerovna`… – na názov
+   ktoréhokoľvek symbolu, s diakritikou aj bez nej. `Enter` si pritom necháva
+   svoj bežný význam, takže písanie viacriadkového výpočtu to neruší.
+   V poznámkových riadkoch pod `#` okno nevyskakuje vôbec.
+4. **Spätná lomka** – napíšeš `\` a začneš písať názov príkazu; `\alp` → `\alpha`.
    Príkazy s argumentmi sa vložia aj so zátvorkami a kurzor skočí dovnútra.
 
 **Skratky navyše**, aby sa fyzika písala kratšie:
