@@ -37,6 +37,7 @@ button, input { font: inherit; color: inherit; }
   align-items: center;
   gap: 14px;
   padding: 9px 14px;
+  padding-top: calc(9px + env(safe-area-inset-top, 0px));
   background: rgba(15, 18, 32, .92);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line);

@@ -24,7 +24,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(String(e)));
 
-const url = 'file://' + resolve(root, 'index.html');
+// TARGET=math-workspace.html preklikaním overí aj zlepený jednosúborový build
+const url = 'file://' + resolve(root, process.env.TARGET || 'index.html');
 await page.goto(url);
 await page.waitForFunction(() => window.MW && window.MW.SYMBOLS);
 

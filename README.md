@@ -47,6 +47,15 @@ Ak chceš lokálny server (napr. kvôli testom):
 npm run serve      # http://localhost:8080
 ```
 
+### Jeden súbor na poslanie
+
+```bash
+npm run build      # vyrobí math-workspace.html (~0,7 MB)
+```
+
+Celá appka vrátane KaTeXu a jeho písiem zlepená do jediného HTML. Dá sa poslať
+mailom, hodiť na USB a otvoriť dvojklikom – funguje aj úplne bez internetu.
+
 ### Na internet cez GitHub Pages
 
 Repozitár je statický web v koreňovom adresári, takže stačí v **Settings → Pages**
@@ -88,6 +97,7 @@ npm test
 - `tests/ui.test.mjs` – preklikanie appky v prehliadači: vykreslenie vzorcov,
   napovedanie po `\`, paleta, kreslenie symbolu myšou, pero, guma, uloženie
   a obnova po obnovení stránky. Priebežne ukladá snímky do `tests/screenshots/`.
+- `npm run test:bundle` – to isté preklikanie, ale na zlepenom jednom súbore.
 
 ## Štruktúra
 
@@ -98,6 +108,7 @@ js/symbols.js         databáza symbolov, šablón, vzorcov a makier
 js/recognizer.js      rozpoznávanie nakreslených symbolov
 js/app.js             plátno, bloky, paleta, napovedanie, ukladanie
 vendor/katex/         KaTeX 0.16.11 (MIT), aby appka fungovala aj offline
+tools/build-single.mjs zlepenie do jedného súboru
 tests/                testy v prehliadači
 ```
 
