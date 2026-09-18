@@ -1,0 +1,16 @@
+{
+  "name": "math-workspace",
+  "version": "1.0.0",
+  "description": "Voľná plocha na písanie matematiky a fyziky – symboly sa dajú aj nakresliť myšou.",
+  "private": true,
+  "scripts": {
+    "serve": "python3 -m http.server 8080",
+    "test": "node tests/recognizer.test.mjs && node tests/ui.test.mjs",
+    "test:recognizer": "node tests/recognizer.test.mjs",
+    "test:ui": "node tests/ui.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  },
+  "license": "MIT"
+}

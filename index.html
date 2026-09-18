@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Math Workspace</title>
+<meta name="description" content="Voľná plocha na písanie matematiky a fyziky – symboly sa dajú aj nakresliť myšou.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>∑</text></svg>">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">∑</span> Math&nbsp;Workspace</div>
+
+  <div class="toolgroup" role="toolbar" aria-label="Nástroje">
+    <button class="tool" data-tool="select" title="Výber a posun (V)"><span>✥</span>Výber</button>
+    <button class="tool" data-tool="text" title="Nový blok (T)"><span>✎</span>Písať</button>
+    <button class="tool" data-tool="pen" title="Kreslenie (P)"><span>✐</span>Pero</button>
+    <button class="tool" data-tool="eraser" title="Guma (E)"><span>⌫</span>Guma</button>
+  </div>
+
+  <div class="toolgroup">
+    <button id="btn-draw" class="accent" title="Nakresli symbol myšou (Ctrl+D)"><span>✍</span>Nakresliť symbol</button>
+    <button id="btn-palette" title="Paleta symbolov a vzorcov (Ctrl+K)"><span>Ω</span>Symboly</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="toolgroup">
+    <button id="btn-zoom-out" title="Oddialiť">−</button>
+    <button id="btn-zoom-reset" title="Pôvodná veľkosť">100&nbsp;%</button>
+    <button id="btn-zoom-in" title="Priblížiť">+</button>
+  </div>
+
+  <div class="toolgroup">
+    <button id="btn-export" title="Uložiť do súboru">Uložiť</button>
+    <button id="btn-import" title="Načítať zo súboru">Načítať</button>
+    <button id="btn-clear" title="Vyprázdniť plochu">Vyčistiť</button>
+    <button id="btn-help" title="Nápoveda">?</button>
+  </div>
+</header>
+
+<main id="stage">
+  <div id="world">
+    <svg id="ink" width="100%" height="100%"></svg>
+  </div>
+  <p id="hint">Dvojklik kamkoľvek = nový blok &nbsp;·&nbsp; ťahaj myšou = posun plochy &nbsp;·&nbsp; Ctrl + koliesko = priblíženie</p>
+</main>
+
+<!-- Paleta symbolov -->
+<aside id="palette" class="panel" hidden>
+  <div class="panel-head">
+    <strong>Symboly a vzorce</strong>
+    <button class="close" data-close="palette" title="Zavrieť">×</button>
+  </div>
+  <input id="palette-search" type="search" placeholder="Hľadaj: suma, integrál, alfa, ohm…" autocomplete="off">
+  <div id="palette-body"></div>
+</aside>
+
+<!-- Kreslenie symbolu -->
+<aside id="draw" class="panel" hidden>
+  <div class="panel-head">
+    <strong>Nakresli symbol</strong>
+    <button class="close" data-close="draw" title="Zavrieť">×</button>
+  </div>
+  <p class="panel-note">Nakresli znak myšou alebo prstom. Viac ťahov je v poriadku.</p>
+  <canvas id="draw-canvas" width="300" height="300"></canvas>
+  <div class="draw-actions">
+    <button id="draw-clear">Vymazať</button>
+    <button id="draw-undo">Späť</button>
+    <span id="draw-status"></span>
+  </div>
+  <div id="draw-results" class="results"></div>
+  <input id="draw-search" type="search" placeholder="Nenašlo to? Hľadaj podľa názvu…" autocomplete="off">
+  <div id="draw-search-results" class="results"></div>
+</aside>
+
+<!-- Nápoveda -->
+<div id="help" class="overlay" hidden>
+  <div class="help-card">
+    <button class="close" data-close="help" title="Zavrieť">×</button>
+    <h2>Ako to funguje</h2>
+    <div class="help-cols">
+      <section>
+        <h3>Plocha</h3>
+        <ul>
+          <li><b>Dvojklik</b> na prázdne miesto – nový blok</li>
+          <li><b>Ťahanie</b> prázdnej plochy – posun</li>
+          <li><b>Ctrl + koliesko</b> – priblíženie</li>
+          <li><b>Medzerník + ťahanie</b> – posun kedykoľvek</li>
+          <li>Blok sa ťahá za horný pásik, <b>×</b> ho zmaže</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Písanie</h3>
+        <ul>
+          <li>Píš bežne: <code>x^2 + 3x - 4 = 0</code></li>
+          <li>Každý riadok bloku je samostatný riadok výpočtu</li>
+          <li>Riadok začínajúci <code>#</code> je obyčajný text (nadpis, poznámka)</li>
+          <li>V textovom režime je matematika medzi <code>$…$</code></li>
+          <li>Napíš <code>\</code> a začni písať názov – ponúkne sa zoznam</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Symboly, ktoré nie sú na klávesnici</h3>
+        <ul>
+          <li><b>Nakresliť symbol</b> – nakresli ho myšou, appka ponúkne zhody</li>
+          <li>Keď si vyberieš zo zoznamu, appka si tvoj rukopis <b>zapamätá</b></li>
+          <li><b>Symboly</b> – paleta so všetkým, aj hotové vzorce z fyziky</li>
+        </ul>
+      </section>
+      <section>
+        <h3>Skratky</h3>
+        <ul>
+          <li><code>V</code> výber, <code>T</code> písanie, <code>P</code> pero, <code>E</code> guma</li>
+          <li><code>Ctrl+D</code> kreslenie symbolu</li>
+          <li><code>Ctrl+K</code> paleta symbolov</li>
+          <li><code>Esc</code> zavrie panely</li>
+        </ul>
+      </section>
+    </div>
+    <p class="help-foot">Všetko sa priebežne ukladá do tohto prehliadača. Tlačidlom <b>Uložiť</b> si plochu stiahneš ako súbor.</p>
+  </div>
+</div>
+
+<div id="autocomplete" class="ac" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<input id="file-input" type="file" accept="application/json,.json" hidden>
+
+<script src="vendor/katex/katex.min.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/recognizer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
