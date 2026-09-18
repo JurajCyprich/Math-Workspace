@@ -28,7 +28,8 @@ page.on('console', (m) => { if (m.type() === 'error') console.log('  [console]',
 await page.goto('file://' + resolve(here, 'harness.html'));
 await page.waitForFunction(() => window.MW && window.MW.Recognizer);
 
-const WEIGHTS = process.env.SWEEP ? [0, 1, 2, 4, 8, 20] : [Number(process.env.W ?? 2)];
+// s<číslo> = penalizácia natiahnutého pohľadu, s99 ho prakticky vypne
+const WEIGHTS = process.env.SWEEP ? ['s99', 's1.0', 's1.1', 's1.25'] : [process.env.W ?? 's1.1'];
 
 const result = await page.evaluate(async ({ wanted, weights }) => {
   const R = window.MW.Recognizer;
@@ -37,7 +38,7 @@ const result = await page.evaluate(async ({ wanted, weights }) => {
 
   await R.build(window.MW.SYMBOLS, SERIF);
 
-  const { rasterize, thin, setCloudWeight } = R._internals;
+  const { rasterize, thin, setCloudWeight, setStretchPenalty } = R._internals;
 
   // „Nakreslené" ťahy: kostra toho istého znaku v inom reze písma.
   // Body podávame ako samostatné jednobodové ťahy – poradie pixelov
@@ -52,7 +53,8 @@ const result = await page.evaluate(async ({ wanted, weights }) => {
 
   const runs = [];
   for (const w of weights) {
-    setCloudWeight(w);
+    if (String(w).startsWith('s')) { setCloudWeight(2); setStretchPenalty(Number(String(w).slice(1))); }
+    else { setCloudWeight(w); setStretchPenalty(99); }
     const rows = [];
     for (const tex of wanted) {
       const ink = inks.get(tex);
@@ -89,7 +91,7 @@ for (const run of result.runs) {
     console.log('');
   }
   console.log(`váha mračna ${String(run.w).padStart(3)}:  top1 ${top1}/${n}   top3 ${top3}/${n}   top8 ${top8}/${n}`);
-  if (top1 / n >= 0.75 && top3 / n >= 0.85) pass = true;
+  if (top1 / n >= 0.82 && top3 / n >= 0.9) pass = true;
 }
 
 await browser.close();

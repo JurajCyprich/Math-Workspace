@@ -125,6 +125,8 @@
 
     el.querySelector('.mode').classList.toggle('on', data.math !== false);
     el.querySelector('.mode').addEventListener('click', function () {
+      beginStep();
+      commitStep();
       data.math = data.math === false;
       this.classList.toggle('on', data.math);
       paint(data);
@@ -144,6 +146,7 @@
     el.addEventListener('mousedown', function () { select(data); });
 
     ta.addEventListener('input', function () {
+      commitStep();            // stav spred začiatku písania, odložený pri fokuse
       data.text = ta.value;
       autosize(ta);
       paint(data);
@@ -154,6 +157,7 @@
       activeEditor = { block: data, ta: ta };
       el.classList.add('editing');
       autosize(ta);
+      beginStep();             // celé jedno písanie je jeden krok späť
     });
     ta.addEventListener('blur', function () {
       if (Autocomplete.busy) return;
@@ -182,14 +186,18 @@
   }
 
   function addBlock(x, y, text, math) {
+    beginStep();
     var data = { id: uid(), x: Math.round(x), y: Math.round(y), text: text || '', math: math !== false };
     state.blocks.push(data);
     makeBlock(data);
+    commitStep();
     save();
     return data;
   }
 
   function removeBlock(data) {
+    beginStep();
+    commitStep();
     var i = state.blocks.indexOf(data);
     if (i >= 0) state.blocks.splice(i, 1);
     if (activeEditor && activeEditor.block === data) activeEditor = null;
@@ -231,8 +239,10 @@
       select(data);
       bar.setPointerCapture(e.pointerId);
       var sx = e.clientX, sy = e.clientY, ox = data.x, oy = data.y;
+      beginStep();
 
       function move(ev) {
+        commitStep();
         data.x = Math.round(ox + (ev.clientX - sx) / state.view.k);
         data.y = Math.round(oy + (ev.clientY - sy) / state.view.k);
         data.el.style.left = data.x + 'px';
@@ -262,6 +272,7 @@
   function insertText(text) {
     var target = ensureEditor();
     var ta = target.ta;
+    beginStep();
     var caretAt = text.indexOf(CARET);
     var clean = text.replace(CARET, '');
 
@@ -281,6 +292,7 @@
     }
     ta.setSelectionRange(pos, pos);
 
+    commitStep();
     target.block.text = ta.value;
     autosize(ta);
     paint(target.block);
@@ -468,7 +480,7 @@
         hit = true;
       }
     }
-    if (hit) save();
+    if (hit) { commitStep(); save(); }
   }
 
   /* ── udalosti na ploche ───────────────────────────────────────────── */
@@ -487,6 +499,8 @@
     }
 
     if (tool === 'pen' && e.button === 0 && !spaceDown) {
+      beginStep();
+      commitStep();
       var s = { pts: [[w.x, w.y]] };
       state.strokes.push(s);
       drawStroke(s);
@@ -510,6 +524,7 @@
 
     if (tool === 'eraser' && e.button === 0 && !spaceDown) {
       stage.setPointerCapture(e.pointerId);
+      beginStep();             // zapíše sa až pri prvom naozaj zmazanom ťahu
       eraseAt(w.x, w.y);
       var erase = function (ev) { var p = toWorld(ev.clientX, ev.clientY); eraseAt(p.x, p.y); };
       var stopErase = function () {
@@ -790,6 +805,39 @@
 
   /* ── ukladanie ────────────────────────────────────────────────────── */
 
+  /* ── história krokov ──────────────────────────────────────────────── */
+
+  var past = [], futureSteps = [], pending = null, MAX_STEPS = 60;
+
+  function snapshot() { return JSON.stringify(serialise()); }
+
+  // Stav pred zásahom si odložíme a zapíšeme ho, až keď sa naozaj niečo
+  // zmenilo – inak by kliknutie bez ťahu vyrobilo prázdny krok späť.
+  function beginStep() { pending = snapshot(); }
+
+  function commitStep() {
+    if (pending === null) return;
+    past.push(pending);
+    if (past.length > MAX_STEPS) past.shift();
+    futureSteps.length = 0;
+    pending = null;
+    refreshSteps();
+  }
+
+  function step(from, to) {
+    if (!from.length) return;
+    to.push(snapshot());
+    load(JSON.parse(from.pop()));
+    pending = null;
+    refreshSteps();
+    save();
+  }
+
+  function refreshSteps() {
+    $('#btn-undo').disabled = !past.length;
+    $('#btn-redo').disabled = !futureSteps.length;
+  }
+
   var saveTimer;
   function save() {
     clearTimeout(saveTimer);
@@ -887,7 +935,10 @@
     var reader = new FileReader();
     reader.onload = function () {
       try {
-        load(JSON.parse(reader.result));
+        var parsed = JSON.parse(reader.result);
+        beginStep();
+        commitStep();
+        load(parsed);
         save();
         toast('Načítané');
       } catch (err) {
@@ -899,10 +950,16 @@
   });
 
   $('#btn-clear').addEventListener('click', function () {
-    if (!confirm('Naozaj vyprázdniť celú plochu? Táto akcia sa nedá vrátiť.')) return;
+    if (!confirm('Naozaj vyprázdniť celú plochu?')) return;
+    beginStep();
+    commitStep();
     load({ view: { x: 0, y: 0, k: 1 }, blocks: [], strokes: [] });
     save();
+    toast('Plocha vyprázdnená · Ctrl+Z to vráti');
   });
+
+  $('#btn-undo').addEventListener('click', function () { step(past, futureSteps); });
+  $('#btn-redo').addEventListener('click', function () { step(futureSteps, past); });
 
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && !isTyping(e.target)) spaceDown = true;
@@ -911,6 +968,17 @@
       $('#palette').hidden = true;
       $('#draw').hidden = true;
       $('#help').hidden = true;
+      return;
+    }
+    // V textovom poli nechávame Ctrl+Z prehliadaču – vracia písmená.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !isTyping(e.target)) {
+      e.preventDefault();
+      if (e.shiftKey) step(futureSteps, past); else step(past, futureSteps);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y' && !isTyping(e.target)) {
+      e.preventDefault();
+      step(futureSteps, past);
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
@@ -983,6 +1051,7 @@
 
     setTool('select');
     applyView();
+    refreshSteps();
 
     // Predlohy na rozpoznávanie postavíme hneď po načítaní písiem,
     // aby prvé kreslenie nečakalo.

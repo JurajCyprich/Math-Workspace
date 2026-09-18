@@ -87,6 +87,9 @@ button, input { font: inherit; color: inherit; }
 .toolgroup button span { font-size: 15px; line-height: 1; }
 .toolgroup button:hover { background: var(--panel-2); color: var(--ink); }
 .toolgroup button.active { background: var(--accent); color: #0d1020; font-weight: 600; }
+.toolgroup button:disabled { opacity: .32; cursor: default; }
+.toolgroup button:disabled:hover { background: transparent; color: var(--muted); }
+#btn-undo, #btn-redo { font-size: 16px; padding: 6px 10px; }
 .toolgroup button.accent { color: var(--accent-2); }
 .toolgroup button.accent:hover { background: rgba(61, 219, 217, .14); }
 

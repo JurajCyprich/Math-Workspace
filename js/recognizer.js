@@ -23,6 +23,8 @@ window.MW = window.MW || {};
   var BLUR_SIGMA = 1.4;
   var BLUR_RADIUS = 3;
   var W_CLOUD = 2.0;              // váha mračna bodov oproti mriežke
+  var FLAT_LIMIT = 0.18;          // pod týmto pomerom strán je tvar už čiara
+  var STRETCH_PENALTY = 1.1;      // zhoda v natiahnutom pohľade platí menej
   var LEARNED_KEY = 'mw:ink-templates:v1';
   var LEARNED_BONUS = 0.82;       // vlastné predlohy sú dôveryhodnejšie
   var MAX_PER_SYMBOL = 8;
@@ -273,14 +275,42 @@ window.MW = window.MW || {};
     return Math.sqrt(s);
   }
 
-  // Popis tvaru = mračno bodov + mriežka hustoty.
+  /* Druhý pohľad na ten istý tvar: osi sa škálujú nezávisle, takže tvar
+   * vyplní celý štvorec. Ručne písaný znak býva oproti tlačenému natiahnutý
+   * na výšku alebo do šírky a v tomto pohľade si zodpovedajú.
+   * Pri tvaroch blízkych čiare to nemá zmysel – „−" by sa stalo „+". */
+  function normalizeStretched(pts) {
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, i;
+    for (i = 0; i < pts.length; i++) {
+      if (pts[i][0] < minX) minX = pts[i][0];
+      if (pts[i][0] > maxX) maxX = pts[i][0];
+      if (pts[i][1] < minY) minY = pts[i][1];
+      if (pts[i][1] > maxY) maxY = pts[i][1];
+    }
+    var w = maxX - minX, h = maxY - minY;
+    if (Math.min(w, h) < FLAT_LIMIT * Math.max(w, h)) return null;
+    var out = new Float32Array(pts.length * 2);
+    for (i = 0; i < pts.length; i++) {
+      out[i * 2] = (pts[i][0] - minX) / w - 0.5;
+      out[i * 2 + 1] = (pts[i][1] - minY) / h - 0.5;
+    }
+    return out;
+  }
+
+  // Popis tvaru = mračno bodov + mriežka hustoty, v oboch pohľadoch.
   function describe(pts) {
     var cloud = normalize(pts);
-    return { cloud: cloud, grid: densityGrid(cloud) };
+    var d = { cloud: cloud, grid: densityGrid(cloud), sCloud: null, sGrid: null };
+    var s = normalizeStretched(pts);
+    if (s) { d.sCloud = s; d.sGrid = densityGrid(s); }
+    return d;
   }
 
   function shapeDistance(a, b) {
-    return gridDistance(a.grid, b.grid) + W_CLOUD * cloudDistance(a.cloud, b.cloud);
+    var base = gridDistance(a.grid, b.grid) + W_CLOUD * cloudDistance(a.cloud, b.cloud);
+    if (!a.sGrid || !b.sGrid) return base;
+    var stretched = gridDistance(a.sGrid, b.sGrid) + W_CLOUD * cloudDistance(a.sCloud, b.sCloud);
+    return Math.min(base, STRETCH_PENALTY * stretched);
   }
 
   function setCloudWeight(w) { W_CLOUD = w; }
@@ -446,7 +476,8 @@ window.MW = window.MW || {};
     _internals: {
       rasterize: rasterize, thin: thin, normalize: normalize, subsample: subsample,
       cloudDistance: cloudDistance, resampleStrokes: resampleStrokes,
-      describe: describe, shapeDistance: shapeDistance, setCloudWeight: setCloudWeight
+      describe: describe, shapeDistance: shapeDistance, setCloudWeight: setCloudWeight,
+      setStretchPenalty: function (v) { STRETCH_PENALTY = v; }
     }
   };
 

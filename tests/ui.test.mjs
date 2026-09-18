@@ -155,7 +155,42 @@ const textMode = await page.locator('.block').first().locator('.render .textline
 check('prepnutie na textový režim', textMode > 0, `textových riadkov=${textMode}`);
 await page.locator('.block').first().locator('.mode').click();
 
-/* 10. nápoveda ------------------------------------------------------ */
+/* 10. krok späť a dopredu ------------------------------------------- */
+await page.locator('.tool[data-tool="select"]').click();
+const blocksBefore = await page.locator('.block').count();
+await page.locator('.block').last().locator('.del').click();
+check('blok sa zmazal', (await page.locator('.block').count()) === blocksBefore - 1);
+
+await page.keyboard.press('Control+z');
+await page.waitForTimeout(120);
+check('Ctrl+Z vrátil zmazaný blok', (await page.locator('.block').count()) === blocksBefore,
+  `blokov=${await page.locator('.block').count()}`);
+
+await page.keyboard.press('Control+Shift+z');
+await page.waitForTimeout(120);
+check('Ctrl+Shift+Z zmazanie zopakoval', (await page.locator('.block').count()) === blocksBefore - 1);
+await page.keyboard.press('Control+z');
+await page.waitForTimeout(120);
+
+// zmazanie kresby sa tiež dá vrátiť
+await page.locator('.tool[data-tool="eraser"]').click();
+await page.mouse.move(1050, 700);
+await page.mouse.down();
+await page.mouse.move(1090, 710);
+await page.mouse.up();
+check('guma zmazala uložený ťah', (await page.locator('#ink path').count()) === 0);
+await page.locator('.tool[data-tool="select"]').click();
+await page.keyboard.press('Control+z');
+await page.waitForTimeout(120);
+check('Ctrl+Z vrátil aj zmazanú kresbu', (await page.locator('#ink path').count()) === 1);
+
+const undoDisabledAtStart = await page.evaluate(() => {
+  const btn = document.querySelector('#btn-undo');
+  return btn && !btn.disabled;
+});
+check('tlačidlo Späť je aktívne, keď je čo vrátiť', undoDisabledAtStart);
+
+/* 11. nápoveda ------------------------------------------------------ */
 await page.locator('#btn-help').click();
 await page.waitForSelector('#help:not([hidden])');
 await page.screenshot({ path: resolve(shots, '05-napoveda.png') });

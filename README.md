@@ -14,6 +14,7 @@ Stačí otvoriť `index.html`.
   `Ctrl` + koliesko približuje.
 - Bloky sa ťahajú za horný pásik, dajú sa duplikovať a mazať.
 - Pero kreslí priamo na plochu (náčrtky, grafy, schémy), guma maže ťahy.
+- `Ctrl+Z` vráti späť čokoľvek – zmazaný blok, zmazanú kresbu aj vyčistenie plochy.
 
 **Písanie**
 - Píšeš bežný zápis: `x^2 + 3x - 4 = 0`. Každý riadok bloku je samostatný riadok výpočtu.
@@ -76,15 +77,20 @@ Bez neurónovej siete a bez internetu, celé v prehliadači (`js/recognizer.js`)
 4. Porovnávajú sa dva príznaky naraz: **rozmazaná mriežka hustoty ťahov**
    (20 × 20, ktorá nesie rozloženie kresby v ploche) a **obojsmerná priemerná
    vzdialenosť k najbližšiemu bodu**.
-5. Vlastné predlohy, ktoré vzniknú tvojím výberom zo zoznamu, majú prednosť
+5. To isté sa počíta ešte raz v **natiahnutom pohľade**, kde sa osi škálujú
+   nezávisle – ručne písaný znak býva oproti tlačenému vyšší alebo širší.
+   Pri tvaroch blízkych čiare sa natiahnutie vynecháva, aby sa `−` nestalo `+`.
+6. Vlastné predlohy, ktoré vzniknú tvojím výberom zo zoznamu, majú prednosť
    pred typografickými.
 
 Postavenie predlôh trvá ~220 ms, jeden dopyt ~14 ms.
 
 Úspešnosť merá `tests/recognizer.test.mjs`: predlohy postaví z pätkových písiem
 a „kreslí" tvary z bezpätkového, ktoré predlohy nikdy nevideli. Na 40 bežných
-symboloch trafí **33/40 na prvý pokus a 35/40 do prvej trojice**. Pri skutočnom
-rukopise pomáha to, že si appka tvoje ťahy pamätá.
+symboloch trafí **35/40 naprvýkrát, 37/40 do prvej trojice a 39/40 do zoznamu**.
+Zvyšné omyly sú väčšinou dvojice, ktoré aj človek rozlíši len podľa veľkosti
+(`∑` vs `Σ`, `∏` vs `Π`) – v ponuke sú aj tak obe. Pri skutočnom rukopise navyše
+pomáha to, že si appka tvoje ťahy pamätá.
 
 ## Testy
 
