@@ -34,7 +34,7 @@ swap('<link rel="stylesheet" href="vendor/katex/katex.min.css">',
 swap('<link rel="stylesheet" href="css/style.css">',
   '<style>' + read('css/style.css') + '</style>');
 
-for (const src of ['vendor/katex/katex.min.js', 'js/symbols.js', 'js/i18n.js', 'js/calc.js',
+for (const src of ['vendor/katex/katex.min.js', 'js/symbols.js', 'js/i18n.js', 'js/calc.js', 'js/letters.js',
   'js/recognizer.js', 'js/app.js']) {
   swap(`<script src="${src}"></script>`, '<script>' + safe(read(src)) + '</script>');
 }

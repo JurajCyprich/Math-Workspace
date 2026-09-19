@@ -42,6 +42,12 @@ Stačí otvoriť `index.html`.
 `\dd` (diferenciál d), `\unit{m}`, `\dv{y}{x}`, `\pdv{f}{x}`, `\abs{x}`, `\norm{v}`,
 `\grad`, `\divg`, `\curl`, `\ket{ψ}`, `\bra{ψ}`, `\braket{φ}{ψ}`, `\R \N \Z \Q \C`.
 
+**Písanie rukou** (`Ctrl+H`) – panel s linajkovým pruhom a poznámkovým blokom
+pod ním. Píšeš celé slová myšou alebo prstom, po krátkej pauze sa prepíšu na
+text. Keď sa nejaký znak netrafí, hneď vedľa je ponuka ďalších možností –
+výberom správneho si appka tvoj rukopis zapamätá. Poznámky sa dajú uložiť ako
+`.txt`, skopírovať alebo vložiť na plochu ako blok.
+
 **Počítanie** – dve cesty:
 - **Priamo v bloku**: pri riadku, ktorý sa dá vyčísliť, sa vpravo ukáže `=`.
   Klikneš a výsledok sa dopíše na koniec riadku. Pri riadku s premennou,
@@ -124,6 +130,16 @@ Bez neurónovej siete a bez internetu, celé v prehliadači (`js/recognizer.js`)
 
 Postavenie predlôh trvá ~220 ms, jeden dopyt ~14 ms.
 
+Písmená používajú ten istý stroj, len s vlastnou sadou predlôh a vlastnou
+pamäťou rukopisu – rozpoznávač je továrnička, nie jedináčik. Navyše im pomáhajú
+**linajky**: tvar sám o sebe nerozlíši „C" od „c", lebo po normalizácii sú to tie
+isté body. Rozhoduje až to, do ktorého pásma medzi linajkami ťah siaha. Na tom
+istom meraní stojí aj „0" verzus „o" či „P" verzus „p". Linajky posúvajú
+úspešnosť zo 40/62 na **48/62 naprvýkrát a 57/62 do prvej trojice** (opäť naprieč
+písmom, ktoré predlohy nevideli). Slovenská diakritika v sade zámerne nie je –
+mäkčeň či dĺžeň robí z glyfu tvar podobný „b" alebo „d" a vytláčal bežné písmená
+z ponuky; na klávesnici sa píše bez problémov.
+
 Úspešnosť merá `tests/recognizer.test.mjs`: predlohy postaví z pätkových písiem
 a „kreslí" tvary z bezpätkového, ktoré predlohy nikdy nevideli. Na 40 bežných
 symboloch trafí **35/40 naprvýkrát, 37/40 do prvej trojice a 39/40 do zoznamu**.
@@ -143,6 +159,7 @@ npm test
   napovedanie po `\`, paleta, kreslenie symbolu myšou, pero, guma, uloženie
   a obnova po obnovení stránky. Priebežne ukladá snímky do `tests/screenshots/`.
 - `tests/calc.test.mjs` – vyhodnocovač výrazov, beží priamo v Node.
+- `tests/letters.test.mjs` – presnosť rozpoznávania písmen s linajkami aj bez nich.
 - `npm run test:bundle` – to isté preklikanie, ale na zlepenom jednom súbore.
 
 ## Štruktúra
@@ -153,6 +170,7 @@ css/style.css         vzhľad
 js/symbols.js         databáza symbolov, šablón, vzorcov a makier
 js/i18n.js            slovenčina a angličtina, register slov na dopĺňanie
 js/calc.js            vyhodnocovanie výrazov (vlastný parser, žiadny eval)
+js/letters.js         abeceda, delenie ťahov na znaky, rozlíšenie podľa linajok
 js/recognizer.js      rozpoznávanie nakreslených symbolov
 js/app.js             plátno, bloky, paleta, napovedanie, ukladanie
 vendor/katex/         KaTeX 0.16.11 (MIT), aby appka fungovala aj offline

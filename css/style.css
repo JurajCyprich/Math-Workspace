@@ -94,6 +94,49 @@ button, input { font: inherit; color: inherit; }
 
 .langs button { padding: 6px 9px; font-size: 12px; font-weight: 600; letter-spacing: .5px; }
 
+/* ── písanie rukou ────────────────────────────────────────────────── */
+
+.panel.wide { width: 560px; }
+
+#note-canvas {
+  width: 100%;
+  height: 170px;
+  background: #0b0e1c;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  touch-action: none;
+  cursor: crosshair;
+  flex: 0 0 auto;
+}
+
+#note-status { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+#note-alts { flex: 0 0 auto; }
+#note-alts .hit { padding: 6px 12px; }
+#note-alts .ch { font-size: 18px; font-weight: 600; }
+
+#note-text {
+  flex: 1 1 auto;
+  min-height: 140px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.65;
+  resize: none;
+  outline: none;
+}
+
+#note-text:focus { border-color: var(--accent); }
+
+@media (max-width: 720px) {
+  .panel.wide { width: auto; }
+}
+
 /* ── kalkulačka ───────────────────────────────────────────────────── */
 
 #calc-input {
@@ -503,7 +546,7 @@ button, input { font: inherit; color: inherit; }
   cursor: crosshair;
 }
 
-.draw-actions { display: flex; align-items: center; gap: 8px; }
+.draw-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .draw-actions button {
   padding: 6px 12px;
@@ -701,19 +744,19 @@ button, input { font: inherit; color: inherit; }
 
 /* Na užších obrazovkách nechávame pri nástrojoch len ikony – ich význam
    drží popis po nabehnutí myšou a lišta sa nezalomí do druhého riadku. */
-@media (max-width: 1540px) {
-  /* Skôr než popisy nástrojov obetujeme názov appky – ikony sú jasné,
-     ale „Výber" a „Guma" sa čítajú lepšie než samotné piktogramy. */
+/* Lišta sa zužuje po vrstvách: najprv padne názov appky, potom popisy
+   nástrojov (ich ikony sú jednoznačné) a nakoniec popisy panelov. */
+@media (max-width: 1700px) {
   .brand .name { display: none; }
   .toolgroup button { padding: 6px 9px; }
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1600px) {
   .tool i { display: none; }
 }
 
-@media (max-width: 1200px) {
-  #btn-draw i, #btn-palette i, #btn-calc i { display: none; }
+@media (max-width: 1500px) {
+  #btn-draw i, #btn-palette i, #btn-calc i, #btn-note i { display: none; }
 }
 
 @media (max-width: 860px) {

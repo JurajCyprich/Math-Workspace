@@ -25,6 +25,7 @@
     <button id="btn-draw" class="accent" data-i18n-title="btn.draw.t"><span>✍</span><i data-i18n="btn.draw">Nakresliť symbol</i></button>
     <button id="btn-palette" data-i18n-title="btn.palette.t"><span>Ω</span><i data-i18n="btn.palette">Symboly</i></button>
     <button id="btn-calc" data-i18n-title="btn.calc.t"><span>=</span><i data-i18n="btn.calc">Kalkulačka</i></button>
+    <button id="btn-note" data-i18n-title="btn.note.t"><span>Aa</span><i data-i18n="btn.note">Písanie rukou</i></button>
   </div>
 
   <div class="toolgroup">
@@ -87,6 +88,38 @@
   <div id="draw-results" class="results"></div>
   <input id="draw-search" type="search" data-i18n-ph="draw.search" autocomplete="off">
   <div id="draw-search-results" class="results"></div>
+</aside>
+
+<!-- Písanie rukou -->
+<aside id="note" class="panel wide" hidden>
+  <div class="panel-head">
+    <strong data-i18n="note.title">Písanie rukou</strong>
+    <button class="close" data-close="note">×</button>
+  </div>
+  <p class="panel-note" data-i18n="note.note"></p>
+
+  <canvas id="note-canvas" height="170"></canvas>
+
+  <div class="draw-actions">
+    <button id="note-commit" class="primary" data-i18n="note.commit">Prepísať</button>
+    <button id="note-space" data-i18n="note.space">Medzera</button>
+    <button id="note-back" data-i18n-title="note.back">⌫</button>
+    <button id="note-enter" data-i18n-title="note.enter">↵</button>
+    <button id="note-clear-ink" data-i18n="note.clearInk">Vymazať</button>
+    <span id="note-status"></span>
+  </div>
+
+  <p class="panel-note" id="note-alts-label" data-i18n="note.alts" hidden></p>
+  <div id="note-alts" class="results"></div>
+
+  <textarea id="note-text" data-i18n-ph="note.ph" spellcheck="false"></textarea>
+
+  <div class="draw-actions">
+    <button id="note-save" class="primary" data-i18n="note.save">Uložiť ako .txt</button>
+    <button id="note-copy" data-i18n="note.copy">Kopírovať</button>
+    <button id="note-board" data-i18n="note.toBoard">Vložiť do plochy</button>
+    <button id="note-clear-text" data-i18n="note.clearText">Vyprázdniť</button>
+  </div>
 </aside>
 
 <!-- Kalkulačka -->
@@ -187,6 +220,7 @@
           <li data-i18n="help.symbols.1"></li>
           <li data-i18n="help.symbols.2"></li>
           <li data-i18n="help.symbols.3"></li>
+          <li data-i18n="help.symbols.4"></li>
         </ul>
       </section>
       <section>
@@ -213,6 +247,7 @@
 <script src="js/symbols.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/calc.js"></script>
+<script src="js/letters.js"></script>
 <script src="js/recognizer.js"></script>
 <script src="js/app.js"></script>
 </body>

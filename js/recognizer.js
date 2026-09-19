@@ -334,152 +334,168 @@ window.MW = window.MW || {};
     return 0.5 * (directed(a, b) + directed(b, a));
   }
 
-  /* ── verejné API ──────────────────────────────────────────────────── */
+  /* ── jedna nezávislá sada predlôh ─────────────────────────────────── */
 
-  var templates = [];     // {tex, shape}
-  var learned = [];       // {tex, shape, pts}
-  var built = false;
-  var skipped = [];
+  /* Rozpoznávač je továrnička, nie jedináčik: matematické symboly a
+   * písmená abecedy potrebujú vlastné predlohy aj vlastnú pamäť rukopisu,
+   * inak by si „O" a „\circ" liezli do cesty.
+   * learnedKey je kľúč, pod ktorým si sada pamätá naučené ťahy. */
+  function makeRecognizer(learnedKey) {
 
-  function loadLearned() {
-    learned = [];
-    try {
-      var raw = JSON.parse(localStorage.getItem(LEARNED_KEY) || '[]');
-      for (var i = 0; i < raw.length; i++) {
-        if (!raw[i].pts || raw[i].pts.length < 4) continue;
-        learned.push({ tex: raw[i].tex, pts: raw[i].pts, shape: describe(raw[i].pts) });
-      }
-    } catch (e) { /* poškodené dáta ignorujeme */ }
-  }
+    var templates = [];     // {tex, shape}
+    var learned = [];       // {tex, shape, pts}
+    var built = false;
+    var skipped = [];
 
-  function saveLearned() {
-    try {
-      localStorage.setItem(LEARNED_KEY, JSON.stringify(learned.map(function (t) {
-        return { tex: t.tex, pts: t.pts };
-      })));
-    } catch (e) { /* plná pamäť – nevadí */ }
-  }
-
-  var Recognizer = {
-    FONT_STACKS: FONT_STACKS,
-
-    get ready() { return built; },
-    get templateCount() { return templates.length; },
-    get skipped() { return skipped.slice(); },
-
-    /* Postaví predlohy zo znakov v MW.SYMBOLS. Beží po častiach, aby
-     * neblokovala vykresľovanie stránky. */
-    build: function (symbols, stacks, onProgress) {
-      symbols = symbols || MW.SYMBOLS;
-      stacks = stacks || FONT_STACKS;
-      if (typeof stacks === 'string') stacks = [stacks];
-      templates = [];
-      skipped = [];
-      loadLearned();
-
-      // Predloha nedostupného znaku – takto spoznáme chýbajúce glyfy.
-      var notdef = stacks.map(function (f) { return rasterize('￿', f); });
-
-      var i = 0;
-      return new Promise(function (resolve) {
-        function chunk() {
-          var end = Math.min(symbols.length, i + 12);
-          for (; i < end; i++) {
-            var s = symbols[i];
-            if (!s.ch || NO_TEMPLATE[s.tex]) continue;
-            var made = 0, seen = [];
-            for (var f = 0; f < stacks.length; f++) {
-              var raster = rasterize(s.ch, stacks[f]);
-              if (raster.count < 6 || sameGrid(raster, notdef[f])) continue;
-              var dup = false;
-              for (var d = 0; d < seen.length; d++) if (sameGrid(raster, seen[d])) { dup = true; break; }
-              if (dup) continue;
-              seen.push(raster);
-
-              var skeleton = thin(raster.grid);
-              // Bodky a podobné drobné znaky sa stenčia takmer na nič –
-              // pre ne použijeme rovno vyplnený tvar.
-              if (skeleton.length < 6) skeleton = rasterPoints(raster.grid);
-              if (skeleton.length < 2) continue;
-              templates.push({
-                tex: s.tex,
-                shape: describe(subsample(skeleton, TPL_POINTS))
-              });
-              made++;
-            }
-            if (!made) skipped.push(s.tex);
-          }
-          if (onProgress) onProgress(i / symbols.length);
-          if (i < symbols.length) {
-            setTimeout(chunk, 0);
-          } else {
-            built = true;
-            resolve(templates.length);
-          }
+    function loadLearned() {
+      learned = [];
+      try {
+        var raw = JSON.parse(localStorage.getItem(learnedKey) || '[]');
+        for (var i = 0; i < raw.length; i++) {
+          if (!raw[i].pts || raw[i].pts.length < 4) continue;
+          learned.push({ tex: raw[i].tex, pts: raw[i].pts, shape: describe(raw[i].pts) });
         }
-        chunk();
-      });
-    },
-
-    /* strokes: pole ťahov, ťah = pole [x,y] v ľubovoľných súradniciach. */
-    recognize: function (strokes, limit) {
-      if (!built) return [];
-      var pts = resampleStrokes(strokes, INK_POINTS);
-      if (pts.length < 2) return [];
-      var ink = describe(pts);
-
-      var best = Object.create(null), i, d;
-      for (i = 0; i < templates.length; i++) {
-        d = shapeDistance(ink, templates[i].shape);
-        if (!(templates[i].tex in best) || d < best[templates[i].tex]) {
-          best[templates[i].tex] = d;
-        }
-      }
-      for (i = 0; i < learned.length; i++) {
-        d = shapeDistance(ink, learned[i].shape) * LEARNED_BONUS;
-        if (!(learned[i].tex in best) || d < best[learned[i].tex]) {
-          best[learned[i].tex] = d;
-        }
-      }
-
-      var out = Object.keys(best).map(function (tex) {
-        return {
-          tex: tex,
-          dist: best[tex],
-          confidence: Math.max(0, Math.min(1, 1 - best[tex] / 1.1))
-        };
-      });
-      out.sort(function (a, b) { return a.dist - b.dist; });
-      return out.slice(0, limit || 8);
-    },
-
-    /* Zapamätá si, že tento ťah znamená daný symbol. */
-    learn: function (strokes, tex) {
-      var pts = resampleStrokes(strokes, INK_POINTS).map(function (p) {
-        return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
-      });
-      if (pts.length < 2) return false;
-      learned.push({ tex: tex, pts: pts, shape: describe(pts) });
-      var mine = learned.filter(function (t) { return t.tex === tex; });
-      if (mine.length > MAX_PER_SYMBOL) {
-        learned.splice(learned.indexOf(mine[0]), 1);
-      }
-      saveLearned();
-      return true;
-    },
-
-    learnedCount: function () { return learned.length; },
-
-    forgetAll: function () { learned = []; saveLearned(); },
-
-    // pomocné funkcie pre testy
-    _internals: {
-      rasterize: rasterize, thin: thin, normalize: normalize, subsample: subsample,
-      cloudDistance: cloudDistance, resampleStrokes: resampleStrokes,
-      describe: describe, shapeDistance: shapeDistance, setCloudWeight: setCloudWeight,
-      setStretchPenalty: function (v) { STRETCH_PENALTY = v; }
+      } catch (e) { /* poškodené dáta ignorujeme */ }
     }
-  };
 
-  MW.Recognizer = Recognizer;
+    function saveLearned() {
+      try {
+        localStorage.setItem(learnedKey, JSON.stringify(learned.map(function (t) {
+          return { tex: t.tex, pts: t.pts };
+        })));
+      } catch (e) { /* plná pamäť – nevadí */ }
+    }
+
+    var Recognizer = {
+      FONT_STACKS: FONT_STACKS,
+
+      get ready() { return built; },
+      get templateCount() { return templates.length; },
+      get skipped() { return skipped.slice(); },
+
+      /* Postaví predlohy zo znakov v MW.SYMBOLS. Beží po častiach, aby
+       * neblokovala vykresľovanie stránky. */
+      build: function (symbols, stacks, onProgress) {
+        symbols = symbols || MW.SYMBOLS;
+        stacks = stacks || FONT_STACKS;
+        if (typeof stacks === 'string') stacks = [stacks];
+        templates = [];
+        skipped = [];
+        loadLearned();
+
+        // Predloha nedostupného znaku – takto spoznáme chýbajúce glyfy.
+        var notdef = stacks.map(function (f) { return rasterize('￿', f); });
+
+        var i = 0;
+        return new Promise(function (resolve) {
+          function chunk() {
+            var end = Math.min(symbols.length, i + 12);
+            for (; i < end; i++) {
+              var s = symbols[i];
+              if (!s.ch || NO_TEMPLATE[s.tex]) continue;
+              var made = 0, seen = [];
+              for (var f = 0; f < stacks.length; f++) {
+                var raster = rasterize(s.ch, stacks[f]);
+                if (raster.count < 6 || sameGrid(raster, notdef[f])) continue;
+                var dup = false;
+                for (var d = 0; d < seen.length; d++) if (sameGrid(raster, seen[d])) { dup = true; break; }
+                if (dup) continue;
+                seen.push(raster);
+
+                var skeleton = thin(raster.grid);
+                // Bodky a podobné drobné znaky sa stenčia takmer na nič –
+                // pre ne použijeme rovno vyplnený tvar.
+                if (skeleton.length < 6) skeleton = rasterPoints(raster.grid);
+                if (skeleton.length < 2) continue;
+                templates.push({
+                  tex: s.tex,
+                  shape: describe(subsample(skeleton, TPL_POINTS))
+                });
+                made++;
+              }
+              if (!made) skipped.push(s.tex);
+            }
+            if (onProgress) onProgress(i / symbols.length);
+            if (i < symbols.length) {
+              setTimeout(chunk, 0);
+            } else {
+              built = true;
+              resolve(templates.length);
+            }
+          }
+          chunk();
+        });
+      },
+
+      /* strokes: pole ťahov, ťah = pole [x,y] v ľubovoľných súradniciach. */
+      recognize: function (strokes, limit, bias) {
+        if (!built) return [];
+        var pts = resampleStrokes(strokes, INK_POINTS);
+        if (pts.length < 2) return [];
+        var ink = describe(pts);
+
+        var best = Object.create(null), i, d;
+        for (i = 0; i < templates.length; i++) {
+          d = shapeDistance(ink, templates[i].shape);
+          if (!(templates[i].tex in best) || d < best[templates[i].tex]) {
+            best[templates[i].tex] = d;
+          }
+        }
+        for (i = 0; i < learned.length; i++) {
+          d = shapeDistance(ink, learned[i].shape) * LEARNED_BONUS;
+          if (!(learned[i].tex in best) || d < best[learned[i].tex]) {
+            best[learned[i].tex] = d;
+          }
+        }
+
+        /* bias smie zhodu iba zdražiť, nie vylúčiť – pri písmenách ním
+         * hovoríme, že ťah siahajúci nad stredné linajky skôr znamená „C"
+         * než „c". Keď sa netrafí, správny znak stále zostane v ponuke. */
+        var out = Object.keys(best).map(function (tex) {
+          var d = best[tex] * (bias ? bias(tex) : 1);
+          return {
+            tex: tex,
+            dist: d,
+            confidence: Math.max(0, Math.min(1, 1 - d / 1.1))
+          };
+        });
+        out.sort(function (a, b) { return a.dist - b.dist; });
+        return out.slice(0, limit || 8);
+      },
+
+      /* Zapamätá si, že tento ťah znamená daný symbol. */
+      learn: function (strokes, tex) {
+        var pts = resampleStrokes(strokes, INK_POINTS).map(function (p) {
+          return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+        });
+        if (pts.length < 2) return false;
+        learned.push({ tex: tex, pts: pts, shape: describe(pts) });
+        var mine = learned.filter(function (t) { return t.tex === tex; });
+        if (mine.length > MAX_PER_SYMBOL) {
+          learned.splice(learned.indexOf(mine[0]), 1);
+        }
+        saveLearned();
+        return true;
+      },
+
+      learnedCount: function () { return learned.length; },
+
+      forgetAll: function () { learned = []; saveLearned(); },
+
+      // pomocné funkcie pre testy
+      _internals: {
+        rasterize: rasterize, thin: thin, normalize: normalize, subsample: subsample,
+        cloudDistance: cloudDistance, resampleStrokes: resampleStrokes,
+        describe: describe, shapeDistance: shapeDistance, setCloudWeight: setCloudWeight,
+        setStretchPenalty: function (v) { STRETCH_PENALTY = v; }
+      }
+    };
+
+    return Recognizer;
+  }
+
+  MW.createRecognizer = makeRecognizer;
+
+  // Matematické symboly – pôvodná sada, na ktorú sa odkazuje zvyšok appky.
+  MW.Recognizer = makeRecognizer(LEARNED_KEY);
 })();

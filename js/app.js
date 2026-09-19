@@ -221,6 +221,7 @@
     Palette.rebuild();
     Draw.relabel();
     Calculator.relabel();
+    Notepad.relabel();
   }
 
   // Dopíše výsledok na koniec riadku. Prázdne „=" na konci nezdvojujeme.
@@ -907,6 +908,260 @@
     };
   })();
 
+  /* ── písanie rukou ────────────────────────────────────────────────── */
+
+  var Notepad = (function () {
+    var TEXT_KEY = 'mw:notes:v1';
+    var PAUSE = 900;                 // po tejto pauze sa ťahy prepíšu samé
+
+    var canvas = $('#note-canvas'), ctx = canvas.getContext('2d');
+    var text = $('#note-text'), status = $('#note-status');
+    var alts = $('#note-alts'), altsLabel = $('#note-alts-label');
+    var reader = MW.createRecognizer('mw:ink-letters:v1');
+    var strokes = [], drawing = false, dpr = 1, timer = null;
+    var lastPick = null;             // {at, ch, strokes} na opravu posledného znaku
+
+    try { text.value = localStorage.getItem(TEXT_KEY) || ''; } catch (e) { /* nevadí */ }
+
+    // Linajky ako v zošite: podľa nich sa pozná veľké písmeno od malého.
+    function guides() {
+      var h = canvas.clientHeight;
+      return { top: h * 0.16, xTop: h * 0.40, base: h * 0.74, desc: h * 0.90 };
+    }
+
+    function fit() {
+      dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      repaint();
+    }
+
+    function repaint() {
+      var g = guides(), w = canvas.clientWidth;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, canvas.clientHeight);
+
+      ctx.fillStyle = 'rgba(124,140,255,.05)';
+      ctx.fillRect(0, g.xTop, w, g.base - g.xTop);
+
+      [[g.top, false], [g.xTop, true], [g.base, false], [g.desc, false]]
+        .forEach(function (row) {
+          ctx.beginPath();
+          ctx.setLineDash(row[1] ? [5, 5] : []);
+          ctx.strokeStyle = row[1] ? 'rgba(152,160,196,.28)' : 'rgba(152,160,196,.45)';
+          ctx.lineWidth = 1;
+          ctx.moveTo(0, row[0] + .5);
+          ctx.lineTo(w, row[0] + .5);
+          ctx.stroke();
+        });
+
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#7c8cff';
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      strokes.forEach(function (st) {
+        ctx.beginPath();
+        st.forEach(function (p, i) { if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); });
+        if (st.length === 1) ctx.lineTo(st[0][0] + .4, st[0][1]);
+        ctx.stroke();
+      });
+    }
+
+    function pos(e) {
+      var r = canvas.getBoundingClientRect();
+      return [e.clientX - r.left, e.clientY - r.top];
+    }
+
+    canvas.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      clearTimeout(timer);
+      drawing = true;
+      strokes.push([pos(e)]);
+      repaint();
+    });
+
+    canvas.addEventListener('pointermove', function (e) {
+      if (!drawing) return;
+      var st = strokes[strokes.length - 1], p = pos(e), last = st[st.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 1.5) return;
+      st.push(p);
+      repaint();
+    });
+
+    function stop() {
+      if (!drawing) return;
+      drawing = false;
+      clearTimeout(timer);
+      timer = setTimeout(commit, PAUSE);
+    }
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    canvas.addEventListener('pointerleave', stop);
+
+    function insert(s) {
+      var at = text.selectionStart;
+      text.value = text.value.slice(0, at) + s + text.value.slice(text.selectionEnd);
+      text.setSelectionRange(at + s.length, at + s.length);
+      remember();
+      return at;
+    }
+
+    function remember() {
+      try { localStorage.setItem(TEXT_KEY, text.value); } catch (e) { /* nevadí */ }
+    }
+
+    function readGroup(group, g) {
+      var mark = MW.Handwriting.tinyMark(group.box, g);
+      if (mark) return { ch: mark, hits: [] };
+
+      var cls = MW.Handwriting.classify(group.box, g);
+      var hits = reader.recognize(group.strokes, 6, MW.Handwriting.bias(cls));
+      return { ch: hits.length ? hits[0].tex : '', hits: hits };
+    }
+
+    function commit() {
+      clearTimeout(timer);
+      if (!strokes.length) return;
+      if (!reader.ready) { status.textContent = MW.t('note.preparing'); return; }
+
+      var g = guides();
+      var xh = g.base - g.xTop;
+      var groups = MW.Handwriting.groupStrokes(strokes, { join: xh * 0.1, space: xh * 0.55 });
+
+      var added = '', last = null, at = text.selectionStart;
+      groups.forEach(function (group) {
+        var read = readGroup(group, g);
+        if (!read.ch) return;
+        if (group.spaceBefore) added += ' ';
+        last = { ch: read.ch, hits: read.hits, strokes: group.strokes, offset: added.length };
+        added += read.ch;
+      });
+
+      strokes = [];
+      repaint();
+
+      if (!added) {
+        status.textContent = MW.t('note.nothing');
+        showAlts(null);
+        return;
+      }
+
+      insert(added);
+      status.textContent = MW.t('note.read', { n: added.trim().length });
+      lastPick = last ? { at: at + last.offset, ch: last.ch, strokes: last.strokes } : null;
+      showAlts(last && last.hits.length ? last.hits : null);
+    }
+
+    function showAlts(hits) {
+      if (!hits || !hits.length) {
+        alts.innerHTML = '';
+        altsLabel.hidden = true;
+        return;
+      }
+      altsLabel.hidden = false;
+      alts.innerHTML = hits.map(function (h) {
+        return '<button class="hit" data-ch="' + esc(h.tex) + '">' +
+          '<span class="ch">' + esc(h.tex) + '</span></button>';
+      }).join('');
+    }
+
+    // Oprava posledného znaku zároveň doučí rozpoznávanie.
+    alts.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ch]');
+      if (!b || !lastPick) return;
+      var ch = b.dataset.ch;
+      if (ch !== lastPick.ch) {
+        text.value = text.value.slice(0, lastPick.at) + ch +
+          text.value.slice(lastPick.at + lastPick.ch.length);
+        text.setSelectionRange(lastPick.at + ch.length, lastPick.at + ch.length);
+        remember();
+      }
+      reader.learn(lastPick.strokes, ch);
+      lastPick.ch = ch;
+      showAlts(null);
+      toast(MW.t('toast.noteLearned'));
+    });
+
+    text.addEventListener('input', remember);
+
+    $('#note-commit').addEventListener('click', commit);
+    $('#note-clear-ink').addEventListener('click', function () {
+      clearTimeout(timer);
+      strokes = [];
+      repaint();
+      status.textContent = '';
+    });
+    $('#note-space').addEventListener('click', function () { insert(' '); text.focus(); });
+    $('#note-enter').addEventListener('click', function () { insert('\n'); text.focus(); });
+    $('#note-back').addEventListener('click', function () {
+      var at = text.selectionStart;
+      if (text.selectionEnd > at) {
+        text.value = text.value.slice(0, at) + text.value.slice(text.selectionEnd);
+      } else if (at > 0) {
+        text.value = text.value.slice(0, at - 1) + text.value.slice(at);
+        at--;
+      }
+      text.setSelectionRange(at, at);
+      text.focus();
+      remember();
+    });
+
+    $('#note-save').addEventListener('click', function () {
+      var blob = new Blob([text.value], { type: 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'poznamky-' + new Date().toISOString().slice(0, 10) + '.txt';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      toast(MW.t('toast.noteSaved'));
+    });
+
+    $('#note-copy').addEventListener('click', function () {
+      if (!text.value) return;
+      var done = function () { toast(MW.t('toast.copied')); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text.value).then(done, fallback);
+      } else { fallback(); }
+      function fallback() {
+        text.select();
+        try { document.execCommand('copy'); done(); } catch (e) { /* nedá sa */ }
+      }
+    });
+
+    $('#note-board').addEventListener('click', function () {
+      if (!text.value.trim()) return;
+      var c = viewCentre();
+      // Poznámky sú text, nie vzorec – blok necháme v textovom režime.
+      startEdit(addBlock(c.x, c.y, text.value.trim(), false));
+      toast(MW.t('toast.inserted'));
+    });
+
+    $('#note-clear-text').addEventListener('click', function () {
+      if (!text.value) return;
+      if (!confirm(MW.t('note.confirmClear'))) return;
+      text.value = '';
+      remember();
+    });
+
+    window.addEventListener('resize', function () { if (!$('#note').hidden) fit(); });
+
+    return {
+      show: function () {
+        $('#note').hidden = false;
+        fit();
+        if (!reader.ready) {
+          status.textContent = MW.t('note.preparing');
+          reader.build(MW.LETTERS.filter(function (l) { return !l.tiny; })).then(function (n) {
+            status.textContent = MW.t('note.ready', { n: n });
+          });
+        }
+      },
+      relabel: function () { showAlts(null); status.textContent = ''; }
+    };
+  })();
+
   /* ── kalkulačka ───────────────────────────────────────────────────── */
 
   var Calculator = (function () {
@@ -1205,6 +1460,11 @@
     if (p.hidden) Draw.show(); else p.hidden = true;
   });
 
+  $('#btn-note').addEventListener('click', function () {
+    var p = $('#note');
+    if (p.hidden) Notepad.show(); else p.hidden = true;
+  });
+
   $('#btn-calc').addEventListener('click', function () {
     var p = $('#calc');
     if (p.hidden) Calculator.show(); else p.hidden = true;
@@ -1279,6 +1539,7 @@
       $('#palette').hidden = true;
       $('#draw').hidden = true;
       $('#calc').hidden = true;
+      $('#note').hidden = true;
       $('#feedback').hidden = true;
       $('#help').hidden = true;
       return;
@@ -1307,6 +1568,11 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
       e.preventDefault();
       Calculator.show();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
+      e.preventDefault();
+      Notepad.show();
       return;
     }
     if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
