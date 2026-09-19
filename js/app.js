@@ -917,7 +917,10 @@
    * priebežne z toho, čo už človek napísal. */
   var Notepad = (function () {
     var TEXT_KEY = 'mw:notes:v1';
-    var IDLE = 650;              // po tejto pauze sa znak zapíše aj bez ďalšieho ťahu
+    /* Kým človek kreslí ďalší ťah toho istého písmena, ľahko sa zamyslí na
+     * sekundu. Krátka pauza preto rozbíjala „A" na dva znaky; znak sa
+     * hlavne zapisuje podľa medzery napravo, čas je len poistka. */
+    var IDLE = 1300;
 
     var text = $('#note-text'), status = $('#note-status');
     var alts = $('#note-alts'), altsLabel = $('#note-alts-label');
@@ -926,8 +929,10 @@
     var track = MW.Handwriting.lineTracker();
 
     var recording = false, building = false;
-    var pending = [], pendingBox = null, prevBox = null;
-    var timer = null, lastPick = null, written = 0;
+    var seg = MW.Handwriting.segmenter();
+    var prevBox = null, timer = null, lastPick = null;
+    var written = [];            // naposledy zapísané znaky, na braní späť
+    var count = 1;
 
     try { text.value = localStorage.getItem(TEXT_KEY) || ''; } catch (e) { /* nevadí */ }
 
@@ -943,17 +948,6 @@
       return at;
     }
 
-    /* Medzera alebo nový riadok podľa toho, kam človek posunul ruku. */
-    function separator(b) {
-      if (!prevBox) return '';
-      var m = track.metrics();
-      var xh = m ? m.xh : Math.max(8, b.maxY - b.minY);
-      // Začal vľavo od predchádzajúceho znaku a nižšie – ide o nový riadok.
-      if (b.minX < prevBox.minX && b.minY > prevBox.minY + 0.6 * xh) return '\n';
-      if (b.minX - prevBox.maxX > 0.5 * xh) return ' ';
-      return '';
-    }
-
     // Prvé písmeno vety veľkým – rovnako ako na telefóne.
     function shift(ch, sep) {
       if (!/^[a-z]$/.test(ch)) return ch;
@@ -966,24 +960,44 @@
       var b = MW.Handwriting.box([pts]);
       var scale = track.scale(Math.max(8, b.maxY - b.minY));
 
-      // Nový ťah napravo od rozpísaného znaku znamená, že ten je hotový.
-      if (pending.length && b.minX > pendingBox.maxX + 0.08 * scale) commit();
+      var step = seg.feed(pts, scale);
+      // Ťah preklenul už zapísané znaky – vezmeme ich z textu späť,
+      // prečítajú sa nanovo aj s ním.
+      if (step.retract) retract(step.retract);
+      if (step.commit) write(step.commit);
 
-      pending.push(pts);
-      pendingBox = MW.Handwriting.box(pending);
       clearTimeout(timer);
-      timer = setTimeout(commit, IDLE);
+      timer = setTimeout(flush, IDLE);
     }
 
-    function commit() {
+    function flush() {
       clearTimeout(timer);
-      if (!pending.length) return;
+      var done = seg.flush();
+      if (done) write(done);
+    }
+
+    /* Zmaže z textu naposledy zapísané znaky aj s ich oddeľovačmi.
+     * Keď človek medzitým do poznámok sám písal, radšej nesiahame na nič. */
+    function retract(howMany) {
+      var taken = written.splice(written.length - howMany, howMany);
+      if (!taken.length) return;
+      var from = taken[0].start, to = taken[taken.length - 1].end;
+      var expect = taken.map(function (w) { return w.text; }).join('');
+      if (text.value.slice(from, to) !== expect) return;
+
+      text.value = text.value.slice(0, from) + text.value.slice(to);
+      text.setSelectionRange(from, from);
+      remember();
+      taken.forEach(function () { track.pop(); });
+      prevBox = written.length ? written[written.length - 1].box : null;
+      lastPick = null;
+      showAlts(null);
+    }
+
+    function write(group) {
       if (!reader.ready) { status.textContent = MW.t('note.preparing'); return; }
 
-      var b = pendingBox, strokes = pending;
-      pending = [];
-      pendingBox = null;
-
+      var b = group.box, strokes = group.strokes;
       var m = track.metrics();
       var ch = null, hits = [];
 
@@ -996,16 +1010,24 @@
       }
       if (!ch) { status.textContent = MW.t('note.nothing'); return; }
 
-      var sep = separator(b);
-      if (sep === '\n') track.reset();      // nová linajka, nový odhad výšok
+      var sep = MW.Handwriting.gapKind(b, prevBox,
+        m ? m.xh : Math.max(8, b.maxY - b.minY));
+      if (sep === '\n') track.reset();      // nový riadok, nový odhad výšok
       track.push(b);
       prevBox = b;
 
-      var at = insert(sep + shift(ch, sep));
-      lastPick = { at: at + sep.length, ch: ch, strokes: strokes };
+      var piece = sep + shift(ch, sep);
+      var start = insert(piece);
+      written.push({
+        start: start, end: start + piece.length, text: piece,
+        ch: ch, box: b, strokes: strokes
+      });
+      if (written.length > 12) written.shift();
+
+      lastPick = { at: start + sep.length, ch: ch, strokes: strokes };
       showAlts(hits);
-      written++;
-      status.textContent = MW.t('note.read', { n: written });
+      status.textContent = MW.t('note.read', { n: count });
+      count++;
     }
 
     function showAlts(hits) {
@@ -1033,6 +1055,12 @@
         remember();
       }
       reader.learn(lastPick.strokes, ch);
+      // opravený znak je rovnako dlhý, takže pozície v texte držia ďalej
+      var last = written[written.length - 1];
+      if (last && last.ch === lastPick.ch) {
+        last.text = last.text.slice(0, -1) + ch;
+        last.ch = ch;
+      }
       lastPick.ch = ch;
       showAlts(null);
       toast(MW.t('toast.noteLearned'));
@@ -1043,13 +1071,13 @@
     function setRecording(on) {
       recording = on;
       recBtn.classList.toggle('active', on);
+      clearTimeout(timer);
+      seg.reset();
+      written = [];
+      prevBox = null;
       if (!on) {
-        clearTimeout(timer);
-        pending = [];
-        pendingBox = null;
         status.textContent = MW.t('note.off');
       } else {
-        prevBox = null;
         track.reset();
         ensureReady();
       }

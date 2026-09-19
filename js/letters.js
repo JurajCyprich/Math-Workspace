@@ -56,6 +56,92 @@ window.MW = window.MW || {};
     return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
   }
 
+  /* Patrí nový ťah ešte k rozpísanému znaku, alebo už začal ďalší?
+   *
+   * Ťahy jedného písmena sa vo vodorovnom smere takmer vždy prekrývajú:
+   * prečiarknutie „A" aj „H" ide cez zvislice, bodka nad „i" leží nad ňou,
+   * druhá šikmá „A" začína tam, kde prvá skončila. Ďalšie písmeno naopak
+   * začína napravo s malou, ale kladnou medzerou. Preto stačí prah tesne
+   * nad nulou – meraný voči výške práve písaného znaku, nie voči odhadu
+   * strednej výšky, ktorý je pri veľkých písmenách mnohonásobne väčší. */
+  function startsNewChar(b, pendingBox, scale) {
+    if (!pendingBox) return false;
+    var height = Math.max(pendingBox.maxY - pendingBox.minY, b.maxY - b.minY, scale || 0);
+    // Ťah, ktorý začína až pod rozpísaným znakom, patrí ďalšiemu riadku.
+    if (b.minY > pendingBox.maxY + 0.15 * height) return true;
+    var gap = b.minX - pendingBox.maxX;
+    if (gap <= 0) return false;                    // ťahy sa prekrývajú
+    return gap > Math.max(2, 0.04 * height);
+  }
+
+  /* Delenie ťahov na znaky, ktoré si vie opraviť vlastné rozhodnutie.
+   *
+   * Zľava doprava sa to inak spraviť nedá: „H" sa píše ako dve zvislice
+   * ďaleko od seba a až potom prečiarknutie. V okamihu druhej zvislice to
+   * vyzerá na nový znak – a až tretí ťah prezradí, že to bolo jedno písmeno.
+   * Preto ťah, ktorý preklenie už vydané znaky, ich vezme späť a prečíta sa
+   * všetko dokopy. Vonku sa medzitým text zobrazí hneď, len sa raz za čas
+   * opraví.
+   *
+   * feed() vráti { retract, commit }: koľko naposledy vydaných znakov treba
+   * vziať späť a ktorý znak je hotový. */
+  function segmenter(keep) {
+    var pending = [], pendingBox = null, emitted = [];
+    var LIMIT = keep || 8;
+
+    function flush() {
+      if (!pending.length) return null;
+      var done = { strokes: pending, box: pendingBox };
+      emitted.push(done);
+      if (emitted.length > LIMIT) emitted.shift();
+      pending = [];
+      pendingBox = null;
+      return done;
+    }
+
+    return {
+      feed: function (stroke, scale) {
+        var b = box([stroke]);
+        var take = 0, i;
+        // Preklenutie sa počíta len v rámci riadku – rovnaké x o riadok
+        // nižšie nemá brať späť nič.
+        for (i = emitted.length - 1; i >= 0; i--) {
+          var e = emitted[i].box;
+          if (b.minX <= e.maxX && b.maxX >= e.minX && b.minY <= e.maxY && b.maxY >= e.minY) take++;
+          else break;
+        }
+
+        var out = { retract: 0, commit: null };
+        if (take) {
+          var back = emitted.splice(emitted.length - take, take), merged = [];
+          back.forEach(function (e) { merged = merged.concat(e.strokes); });
+          pending = merged.concat(pending, [stroke]);
+          out.retract = take;
+        } else {
+          if (startsNewChar(b, pendingBox, scale)) out.commit = flush();
+          pending.push(stroke);
+        }
+        pendingBox = box(pending);
+        return out;
+      },
+      flush: flush,
+      pendingBox: function () { return pendingBox; },
+      reset: function () { pending = []; pendingBox = null; emitted = []; }
+    };
+  }
+
+  /* Čo patrí pred nový znak: nič, medzera alebo nový riadok.
+   * Nový riadok len vtedy, keď znak začal pod spodkom predchádzajúceho
+   * a zároveň vľavo – teda ruka sa naozaj presunula na ďalší riadok.
+   * Samotné „začal nižšie" nestačí, to robí aj prečiarknutie „A". */
+  function gapKind(b, prevBox, xh) {
+    if (!prevBox) return '';
+    var unit = Math.max(xh, 1);
+    if (b.minY > prevBox.maxY - 0.25 * unit && b.minX < prevBox.minX) return '\n';
+    if (b.minX - prevBox.maxX > 0.6 * unit) return ' ';
+    return '';
+  }
+
   /* Na voľnej ploche žiadne linajky nie sú, takže si ich odvodíme z toho,
    * čo človek práve napísal: základná linajka je spodok väčšiny znakov a
    * stredná výška je spodná tretina ich výšok (väčšina písmen je nízkych).
@@ -84,6 +170,7 @@ window.MW = window.MW || {};
         boxes.push(b);
         if (boxes.length > LIMIT) boxes.shift();
       },
+      pop: function () { boxes.pop(); },
       /* Odhad strednej výšky ešte pred tretím znakom – na delenie ťahov
        * treba nejakú mierku hneď od prvého písmena. */
       scale: function (fallback) {
@@ -128,10 +215,13 @@ window.MW = window.MW || {};
     return (b.maxY - b.minY) > (b.maxX - b.minX) * 1.4 ? ',' : '.';
   }
 
-  MW.LETTERS = LETTERS;
-  MW.Handwriting = {
+  window.MW.LETTERS = LETTERS;
+  window.MW.Handwriting = {
     box: box,
     lineTracker: lineTracker,
+    startsNewChar: startsNewChar,
+    segmenter: segmenter,
+    gapKind: gapKind,
     bias: bias,
     tinyMark: tinyMark,
     byChar: function (ch) { return BY_CH[ch]; }

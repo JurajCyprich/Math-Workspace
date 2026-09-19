@@ -44,7 +44,9 @@ Stačí otvoriť `index.html`.
 
 **Poznámky z rukopisu** (`Ctrl+H`) – otvorí sa textové okno a prepne sa na pero.
 Píšeš rukou **priamo na plochu** a každé písmeno sa prepíše hneď, ako začneš
-ďalšie – nečaká sa na dopísanie slova. Ťahy zostanú na ploche ako kresba, takže
+ďalšie – nečaká sa na dopísanie slova. Písmená z viacerých ťahov to zvláda:
+keď ťah preklenie už zapísané znaky (prečiarknutie „H" ide cez obe zvislice),
+appka ich vezme z textu späť a prečíta ich dokopy. Ťahy zostanú na ploche ako kresba, takže
 máš aj rukopis, aj text. Keď sa znak netrafí, vedľa je ponuka ďalších možností;
 výberom správneho si appka tvoj rukopis zapamätá. Prvé písmeno vety sa píše
 veľkým samo. Poznámky sa dajú uložiť ako `.txt`, načítať späť, skopírovať alebo
@@ -184,6 +186,7 @@ npm test
   napovedanie po `\`, paleta, kreslenie symbolu myšou, pero, guma, uloženie
   a obnova po obnovení stránky. Priebežne ukladá snímky do `tests/screenshots/`.
 - `tests/calc.test.mjs` – vyhodnocovač výrazov, beží priamo v Node.
+- `tests/segmentation.test.mjs` – delenie ťahov na znaky, tiež priamo v Node.
 - `tests/letters.test.mjs` – presnosť rozpoznávania písmen s linajkami aj bez nich.
 - `npm run test:bundle` – to isté preklikanie, ale na zlepenom jednom súbore.
 
@@ -195,7 +198,7 @@ css/style.css         vzhľad
 js/symbols.js         databáza symbolov, šablón, vzorcov a makier
 js/i18n.js            slovenčina a angličtina, register slov na dopĺňanie
 js/calc.js            vyhodnocovanie výrazov (vlastný parser, žiadny eval)
-js/letters.js         abeceda a odhad linajok z toho, čo je napísané
+js/letters.js         abeceda, delenie ťahov na znaky, odhad linajok
 js/recognizer.js      rozpoznávanie nakreslených symbolov
 js/app.js             plátno, bloky, paleta, napovedanie, ukladanie
 vendor/katex/         KaTeX 0.16.11 (MIT), aby appka fungovala aj offline

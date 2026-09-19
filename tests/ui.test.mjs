@@ -398,6 +398,27 @@ check('ťahy zostali aj ako kresba na ploche',
   `ťahov=${await page.locator('#ink path').count()}`);
 await page.screenshot({ path: resolve(shots, '10-poznamky.png') });
 
+/* Písmeno z viacerých ťahov nesmie skončiť ako viac znakov. „H" sa píše
+ * ako dve zvislice ďaleko od seba a až potom prečiarknutie – v tej chvíli
+ * to vyzerá na dva znaky a appka to musí vziať späť. */
+await page.locator('#note-rec').click();     // vypnutím a zapnutím vynulujeme stav
+await page.locator('#note-rec').click();
+await page.locator('#note-text').fill('');
+const stroke = async (x1, y1, x2, y2) => {
+  await page.mouse.move(x1, y1);
+  await page.mouse.down();
+  await page.mouse.move((x1 + x2) / 2, (y1 + y2) / 2);
+  await page.mouse.move(x2, y2);
+  await page.mouse.up();
+};
+await stroke(250, 620, 250, 720);        // ľavá zvislica
+await stroke(320, 620, 320, 720);        // pravá zvislica, ďaleko vpravo
+await stroke(250, 670, 320, 670);        // prečiarknutie cez obe
+await page.waitForTimeout(1800);         // nech dobehne pauza
+const hOnly = await page.locator('#note-text').inputValue();
+check('písmeno z troch ťahov dalo jeden znak, nie tri',
+  hOnly.trim().length === 1, JSON.stringify(hOnly));
+
 // oprava posledného znaku doučí rozpoznávanie
 const altCount = await page.locator('#note-alts .hit').count();
 check('pri neistote sa ponúknu ďalšie možnosti', altCount > 0, `možností=${altCount}`);
