@@ -42,11 +42,13 @@ Stačí otvoriť `index.html`.
 `\dd` (diferenciál d), `\unit{m}`, `\dv{y}{x}`, `\pdv{f}{x}`, `\abs{x}`, `\norm{v}`,
 `\grad`, `\divg`, `\curl`, `\ket{ψ}`, `\bra{ψ}`, `\braket{φ}{ψ}`, `\R \N \Z \Q \C`.
 
-**Písanie rukou** (`Ctrl+H`) – panel s linajkovým pruhom a poznámkovým blokom
-pod ním. Píšeš celé slová myšou alebo prstom, po krátkej pauze sa prepíšu na
-text. Keď sa nejaký znak netrafí, hneď vedľa je ponuka ďalších možností –
-výberom správneho si appka tvoj rukopis zapamätá. Poznámky sa dajú uložiť ako
-`.txt`, skopírovať alebo vložiť na plochu ako blok.
+**Poznámky z rukopisu** (`Ctrl+H`) – otvorí sa textové okno a prepne sa na pero.
+Píšeš rukou **priamo na plochu** a každé písmeno sa prepíše hneď, ako začneš
+ďalšie – nečaká sa na dopísanie slova. Ťahy zostanú na ploche ako kresba, takže
+máš aj rukopis, aj text. Keď sa znak netrafí, vedľa je ponuka ďalších možností;
+výberom správneho si appka tvoj rukopis zapamätá. Prvé písmeno vety sa píše
+veľkým samo. Poznámky sa dajú uložiť ako `.txt`, načítať späť, skopírovať alebo
+vložiť na plochu ako blok, a držia sa v prehliadači.
 
 **Počítanie** – dve cesty:
 - **Priamo v bloku**: pri riadku, ktorý sa dá vyčísliť, sa vpravo ukáže `=`.
@@ -131,14 +133,21 @@ Bez neurónovej siete a bez internetu, celé v prehliadači (`js/recognizer.js`)
 Postavenie predlôh trvá ~220 ms, jeden dopyt ~14 ms.
 
 Písmená používajú ten istý stroj, len s vlastnou sadou predlôh a vlastnou
-pamäťou rukopisu – rozpoznávač je továrnička, nie jedináčik. Navyše im pomáhajú
-**linajky**: tvar sám o sebe nerozlíši „C" od „c", lebo po normalizácii sú to tie
-isté body. Rozhoduje až to, do ktorého pásma medzi linajkami ťah siaha. Na tom
-istom meraní stojí aj „0" verzus „o" či „P" verzus „p". Linajky posúvajú
-úspešnosť zo 40/62 na **48/62 naprvýkrát a 57/62 do prvej trojice** (opäť naprieč
-písmom, ktoré predlohy nevideli). Slovenská diakritika v sade zámerne nie je –
-mäkčeň či dĺžeň robí z glyfu tvar podobný „b" alebo „d" a vytláčal bežné písmená
-z ponuky; na klávesnici sa píše bez problémov.
+pamäťou rukopisu – rozpoznávač je továrnička, nie jedináčik.
+
+Navyše im pomáha **výška ťahu**: tvar sám o sebe nerozlíši „C" od „c", lebo po
+normalizácii sú to tie isté body. Na voľnej ploche ale žiadne linajky nie sú,
+tak sa odhadujú priebežne z posledných napísaných znakov – základná linajka je
+spodok väčšiny z nich a stredná výška spodná tretina ich výšok. Na tom istom
+meraní stojí aj „0" verzus „o" či „P" verzus „p". Výška zhodu iba zdražuje,
+nikdy nevylučuje, takže keď sa zmeria zle, správny znak zostane v ponuke; kým
+nie je z čoho merať, výška sa neberie do úvahy vôbec. Posúva úspešnosť zo 40/62
+na **48/62 naprvýkrát a 57/62 do prvej trojice** (opäť naprieč písmom, ktoré
+predlohy nevideli).
+
+Slovenská diakritika v sade zámerne nie je – mäkčeň či dĺžeň robí z glyfu tvar
+podobný „b" alebo „d" a vytláčal bežné písmená z ponuky; na klávesnici sa píše
+bez problémov.
 
 Úspešnosť merá `tests/recognizer.test.mjs`: predlohy postaví z pätkových písiem
 a „kreslí" tvary z bezpätkového, ktoré predlohy nikdy nevideli. Na 40 bežných
@@ -170,7 +179,7 @@ css/style.css         vzhľad
 js/symbols.js         databáza symbolov, šablón, vzorcov a makier
 js/i18n.js            slovenčina a angličtina, register slov na dopĺňanie
 js/calc.js            vyhodnocovanie výrazov (vlastný parser, žiadny eval)
-js/letters.js         abeceda, delenie ťahov na znaky, rozlíšenie podľa linajok
+js/letters.js         abeceda a odhad linajok z toho, čo je napísané
 js/recognizer.js      rozpoznávanie nakreslených symbolov
 js/app.js             plátno, bloky, paleta, napovedanie, ukladanie
 vendor/katex/         KaTeX 0.16.11 (MIT), aby appka fungovala aj offline

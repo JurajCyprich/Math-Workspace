@@ -1,9 +1,9 @@
-/* Písmená pre ručné písanie na linajky.
+/* Písmená pre ručné písanie na plochu.
  *
  * Tvar sám o sebe nerozlíši „C" od „c" – po normalizácii sú to tie isté body.
- * Rozhoduje až výška ťahu voči linajkám: čo siaha nad strednú linajku, je
- * veľké písmeno alebo písmeno s horným dotiahnutím; čo klesá pod základnú
- * linajku, má dolné dotiahnutie. To isté oddelí „0" od „o" či „P" od „p".
+ * Rozhoduje až to, ako vysoko ťah siaha voči ostatným napísaným znakom.
+ * Na voľnej ploche žiadne linajky nie sú, takže si ich odhadujeme priebežne
+ * z toho, čo už človek napísal. Rovnako sa oddelí „0" od „o" či „P" od „p".
  */
 window.MW = window.MW || {};
 
@@ -56,55 +56,60 @@ window.MW = window.MW || {};
     return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
   }
 
-  /* Rozdelí ťahy na jednotlivé znaky podľa vodorovných medzier.
-   * Ťahy jedného písmena sa prekrývajú alebo takmer dotýkajú – bodka nad „i"
-   * aj prečiarknutie „t" tak zostanú pri svojom písmene. Väčšia medzera
-   * znamená nový znak, ešte väčšia medzeru v texte. */
-  function groupStrokes(strokes, opts) {
-    opts = opts || {};
-    var join = opts.join || 4;          // ešte to isté písmeno
-    var space = opts.space || 40;       // medzera v texte
+  /* Na voľnej ploche žiadne linajky nie sú, takže si ich odvodíme z toho,
+   * čo človek práve napísal: základná linajka je spodok väčšiny znakov a
+   * stredná výška je spodná tretina ich výšok (väčšina písmen je nízkych).
+   * Kým nie je z čoho merať, radšej nehádame a výšku neberieme do úvahy. */
+  function lineTracker(keep) {
+    var boxes = [];
+    var LIMIT = keep || 14;
 
-    var items = strokes
-      .filter(function (st) { return st && st.length; })
-      .map(function (st) { return { st: st, b: box([st]) }; })
-      .sort(function (a, b) { return a.b.minX - b.b.minX; });
+    function percentile(list, p) {
+      var a = list.slice().sort(function (x, y) { return x - y; });
+      return a[Math.min(a.length - 1, Math.floor(p * a.length))];
+    }
 
-    var groups = [];
-    items.forEach(function (it) {
-      var last = groups[groups.length - 1];
-      if (last && it.b.minX <= last.right + join) {
-        last.strokes.push(it.st);
-        last.right = Math.max(last.right, it.b.maxX);
-        return;
-      }
-      groups.push({
-        strokes: [it.st],
-        left: it.b.minX,
-        right: it.b.maxX,
-        spaceBefore: !!last && (it.b.minX - last.right) > space
-      });
-    });
+    function metrics() {
+      if (boxes.length < 3) return null;
+      return {
+        base: percentile(boxes.map(function (b) { return b.maxY; }), 0.5),
+        xh: Math.max(1, percentile(boxes.map(function (b) { return b.maxY - b.minY; }), 0.35))
+      };
+    }
 
-    groups.forEach(function (g) { g.box = box(g.strokes); });
-    return groups;
-  }
-
-  /* Do akého pásma medzi linajkami znak siaha. */
-  function classify(b, guides) {
-    var xh = Math.max(1, guides.base - guides.xTop);
-    var tol = 0.18 * xh;
     return {
-      tall: b.minY < guides.xTop - tol,
-      deep: b.maxY > guides.base + tol,
-      height: b.maxY - b.minY,
-      width: b.maxX - b.minX
+      metrics: metrics,
+      reset: function () { boxes = []; },
+      push: function (b) {
+        boxes.push(b);
+        if (boxes.length > LIMIT) boxes.shift();
+      },
+      /* Odhad strednej výšky ešte pred tretím znakom – na delenie ťahov
+       * treba nejakú mierku hneď od prvého písmena. */
+      scale: function (fallback) {
+        var m = metrics();
+        if (m) return m.xh;
+        if (boxes.length) {
+          return Math.max(1, percentile(boxes.map(function (b) { return b.maxY - b.minY; }), 0.35));
+        }
+        return fallback;
+      },
+      classify: function (b) {
+        var m = metrics();
+        if (!m) return { unknown: true, tall: false, deep: false };
+        return {
+          unknown: false,
+          tall: (m.base - b.minY) > 1.32 * m.xh,
+          deep: (b.maxY - m.base) > 0.3 * m.xh
+        };
+      }
     };
   }
 
   /* Zvýhodní znaky, ktoré do nameraného pásma sedia. Zhodu iba zdražuje,
    * takže keď sa výška zmeria zle, správny znak zostane v ponuke. */
   function bias(cls) {
+    if (!cls || cls.unknown) return null;      // nemeriame – nehádžeme váhu
     return function (ch) {
       var l = BY_CH[ch];
       if (!l) return 1;
@@ -126,8 +131,7 @@ window.MW = window.MW || {};
   MW.LETTERS = LETTERS;
   MW.Handwriting = {
     box: box,
-    groupStrokes: groupStrokes,
-    classify: classify,
+    lineTracker: lineTracker,
     bias: bias,
     tinyMark: tinyMark,
     byChar: function (ch) { return BY_CH[ch]; }

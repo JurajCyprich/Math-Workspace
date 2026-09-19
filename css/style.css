@@ -98,16 +98,23 @@ button, input { font: inherit; color: inherit; }
 
 .panel.wide { width: 560px; }
 
-#note-canvas {
-  width: 100%;
-  height: 170px;
-  background: #0b0e1c;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  touch-action: none;
-  cursor: crosshair;
-  flex: 0 0 auto;
+/* Prepínač prepisu – bodka svieti, keď sa ťahy naozaj zapisujú. */
+.draw-actions button.toggle { display: inline-flex; align-items: center; gap: 8px; }
+
+.toggle .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3d4470;
+  transition: background .15s, box-shadow .15s;
 }
+
+.draw-actions button.toggle.active {
+  border-color: var(--accent-2);
+  color: var(--ink);
+}
+
+.toggle.active .dot { background: var(--accent-2); box-shadow: 0 0 0 4px rgba(61, 219, 217, .18); }
 
 #note-status { margin-left: auto; color: var(--muted); font-size: 12px; }
 
@@ -744,19 +751,17 @@ button, input { font: inherit; color: inherit; }
 
 /* Na užších obrazovkách nechávame pri nástrojoch len ikony – ich význam
    drží popis po nabehnutí myšou a lišta sa nezalomí do druhého riadku. */
-/* Lišta sa zužuje po vrstvách: najprv padne názov appky, potom popisy
-   nástrojov (ich ikony sú jednoznačné) a nakoniec popisy panelov. */
-@media (max-width: 1700px) {
+/* Popisy tlačidiel zostávajú – radšej nech sa lišta zalomí do druhého riadku,
+   než by mal človek hádať, čo ktorá ikonka robí. Ustupuje len názov appky. */
+@media (max-width: 1720px) {
   .brand .name { display: none; }
-  .toolgroup button { padding: 6px 9px; }
+  .toolgroup button { padding: 6px 8px; }
+  .toolgroup button i { font-size: 13.5px; }
 }
 
-@media (max-width: 1600px) {
-  .tool i { display: none; }
-}
-
-@media (max-width: 1500px) {
-  #btn-draw i, #btn-palette i, #btn-calc i, #btn-note i { display: none; }
+/* Až na telefóne, kde by lišta zožrala pol obrazovky, ostanú samotné ikony. */
+@media (max-width: 720px) {
+  .tool i, #btn-draw i, #btn-palette i, #btn-calc i, #btn-note i { display: none; }
 }
 
 @media (max-width: 860px) {

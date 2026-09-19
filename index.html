@@ -90,22 +90,16 @@
   <div id="draw-search-results" class="results"></div>
 </aside>
 
-<!-- Písanie rukou -->
+<!-- Poznámky z rukopisu -->
 <aside id="note" class="panel wide" hidden>
   <div class="panel-head">
-    <strong data-i18n="note.title">Písanie rukou</strong>
+    <strong data-i18n="note.title">Poznámky</strong>
     <button class="close" data-close="note">×</button>
   </div>
   <p class="panel-note" data-i18n="note.note"></p>
 
-  <canvas id="note-canvas" height="170"></canvas>
-
   <div class="draw-actions">
-    <button id="note-commit" class="primary" data-i18n="note.commit">Prepísať</button>
-    <button id="note-space" data-i18n="note.space">Medzera</button>
-    <button id="note-back" data-i18n-title="note.back">⌫</button>
-    <button id="note-enter" data-i18n-title="note.enter">↵</button>
-    <button id="note-clear-ink" data-i18n="note.clearInk">Vymazať</button>
+    <button id="note-rec" class="toggle" data-i18n-title="note.rec.t"><span class="dot"></span><i data-i18n="note.rec">Zapisovať rukopis</i></button>
     <span id="note-status"></span>
   </div>
 
@@ -116,6 +110,7 @@
 
   <div class="draw-actions">
     <button id="note-save" class="primary" data-i18n="note.save">Uložiť ako .txt</button>
+    <button id="note-load" data-i18n="note.load">Načítať .txt</button>
     <button id="note-copy" data-i18n="note.copy">Kopírovať</button>
     <button id="note-board" data-i18n="note.toBoard">Vložiť do plochy</button>
     <button id="note-clear-text" data-i18n="note.clearText">Vyprázdniť</button>
@@ -242,6 +237,7 @@
 <div id="autocomplete" class="ac" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <input id="file-input" type="file" accept="application/json,.json" hidden>
+<input id="note-file" type="file" accept="text/plain,.txt" hidden>
 
 <script src="vendor/katex/katex.min.js"></script>
 <script src="js/symbols.js"></script>

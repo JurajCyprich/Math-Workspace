@@ -354,15 +354,21 @@ const stillOffered = await calcBlock.locator('.calc-line').count();
 check('hotový riadok už tlačidlo neponúka', stillOffered === calcButtons - 1,
   `pred=${calcButtons} po=${stillOffered}`);
 
-/* 12d. písanie rukou ------------------------------------------------ */
+/* 12d. poznámky z rukopisu ----------------------------------------- */
 await page.locator('#btn-note').click();
 await page.waitForSelector('#note:not([hidden])');
-await page.waitForFunction(() => document.querySelector('#note-status').textContent.includes('znakov')
-  || document.querySelector('#note-status').textContent.includes('characters'), null, { timeout: 20000 });
+check('otvorenie poznámok prepne na pero',
+  await page.locator('.tool[data-tool="pen"]').evaluate((el) => el.classList.contains('active')));
+check('prepis je hneď zapnutý',
+  await page.locator('#note-rec').evaluate((el) => el.classList.contains('active')));
+await page.waitForFunction(
+  () => /znakov pripravených|characters ready/.test(document.querySelector('#note-status').textContent),
+  null, { timeout: 20000 });
 
-const strip = await page.locator('#note-canvas').boundingBox();
-// dve „písmená" vedľa seba: kruh a zvislica – na text stačí, že niečo prečíta
-async function writeCircle(cx, cy, r) {
+await page.locator('#note-text').fill('');
+
+// píšeme perom priamo na plochu: krúžok, potom zvislica vedľa neho
+async function penCircle(cx, cy, r) {
   await page.mouse.move(cx + r, cy);
   await page.mouse.down();
   for (let i = 1; i <= 24; i++) {
@@ -371,45 +377,54 @@ async function writeCircle(cx, cy, r) {
   }
   await page.mouse.up();
 }
-const midY = strip.y + strip.height * 0.57;
-await writeCircle(strip.x + 70, midY, strip.height * 0.17);
-await page.mouse.move(strip.x + 150, strip.y + strip.height * 0.20);
-await page.mouse.down();
-await page.mouse.move(strip.x + 150, strip.y + strip.height * 0.74);
-await page.mouse.up();
+await penCircle(320, 640, 26);
 
-await page.locator('#note-commit').click();
-await page.waitForTimeout(300);
-const written = await page.locator('#note-text').inputValue();
-check('ručné písmo sa prepísalo na text', written.length >= 2, JSON.stringify(written));
-check('ponúkli sa aj iné možnosti', (await page.locator('#note-alts .hit').count()) > 0,
-  (await page.locator('#note-alts .hit .ch').allTextContents()).join(''));
-await page.screenshot({ path: resolve(shots, '10-pisanie-rukou.png') });
+// hneď po začatí ďalšieho znaku musí byť prvý už prepísaný – bez čakania
+await page.mouse.move(420, 600);
+await page.mouse.down();
+await page.mouse.move(420, 665);
+await page.mouse.up();
+const liveAfterSecond = await page.locator('#note-text').inputValue();
+check('prvé písmeno je v texte hneď, ako začne druhé', liveAfterSecond.length >= 1,
+  JSON.stringify(liveAfterSecond));
+
+await page.waitForFunction(
+  () => document.querySelector('#note-text').value.length >= 2, null, { timeout: 4000 });
+const both = await page.locator('#note-text').inputValue();
+check('po pauze sa zapíše aj druhé písmeno', both.length >= 2, JSON.stringify(both));
+check('prvé písmeno vety je veľké', /^[A-Z0-9(]/.test(both), JSON.stringify(both));
+check('ťahy zostali aj ako kresba na ploche',
+  (await page.locator('#ink path').count()) >= 2,
+  `ťahov=${await page.locator('#ink path').count()}`);
+await page.screenshot({ path: resolve(shots, '10-poznamky.png') });
 
 // oprava posledného znaku doučí rozpoznávanie
-const altChars = await page.locator('#note-alts .hit .ch').allTextContents();
-const different = altChars.findIndex((c) => c !== written.slice(-1));
-if (different >= 0) {
-  await page.locator('#note-alts .hit').nth(different).click();
-  await page.waitForTimeout(150);
-  const fixed = await page.locator('#note-text').inputValue();
-  check('výber inej možnosti opravil posledný znak',
-    fixed.slice(-1) === altChars[different], JSON.stringify(fixed.slice(-3)));
-  const taught = await page.evaluate(() => {
-    try { return JSON.parse(localStorage.getItem('mw:ink-letters:v1') || '[]').length; }
-    catch (e) { return 0; }
-  });
-  check('oprava sa uložila do pamäte rukopisu', taught === 1, `uložených=${taught}`);
+const altCount = await page.locator('#note-alts .hit').count();
+check('pri neistote sa ponúknu ďalšie možnosti', altCount > 0, `možností=${altCount}`);
+if (altCount > 1) {
+  const chars = await page.locator('#note-alts .hit .ch').allTextContents();
+  const other = chars.findIndex((c) => c !== both.slice(-1));
+  if (other >= 0) {
+    await page.locator('#note-alts .hit').nth(other).click();
+    await page.waitForTimeout(150);
+    check('výber inej možnosti opravil posledný znak',
+      (await page.locator('#note-text').inputValue()).slice(-1) === chars[other]);
+    const taught = await page.evaluate(() => {
+      try { return JSON.parse(localStorage.getItem('mw:ink-letters:v1') || '[]').length; }
+      catch (e) { return 0; }
+    });
+    check('oprava sa uložila do pamäte rukopisu', taught === 1, `uložených=${taught}`);
+  }
 }
 
-// tlačidlá na medzeru a mazanie
-const beforeSpace = await page.locator('#note-text').inputValue();
-await page.locator('#note-space').click();
-check('tlačidlo Medzera pridá medzeru',
-  (await page.locator('#note-text').inputValue()) === beforeSpace + ' ');
-await page.locator('#note-back').click();
-check('tlačidlo Zmazať znak medzeru odobralo',
-  (await page.locator('#note-text').inputValue()) === beforeSpace);
+// vypnutý prepis už ťahy nezapisuje
+await page.locator('#note-rec').click();
+const beforeOff = await page.locator('#note-text').inputValue();
+await penCircle(560, 640, 26);
+await page.waitForTimeout(900);
+check('po vypnutí sa ťahy do textu nezapisujú',
+  (await page.locator('#note-text').inputValue()) === beforeOff);
+await page.locator('#note-rec').click();
 
 // uloženie do .txt
 const download = await Promise.all([
@@ -427,6 +442,7 @@ await page.locator('#btn-note').click();
 check('poznámky prežili obnovenie stránky',
   (await page.locator('#note-text').inputValue()) === notes);
 await page.locator('[data-close="note"]').click();
+await page.locator('.tool[data-tool="select"]').click();
 
 /* 13. spätná väzba -------------------------------------------------- */
 await page.locator('#btn-feedback').click();
@@ -501,7 +517,7 @@ check('žiadny príkaz nie je zalomený na dva riadky', help.brokenCode === 0,
 
 // lišta musí držať jeden riadok aj na bežnom notebooku
 await page.keyboard.press('Escape');
-await page.setViewportSize({ width: 1280, height: 860 });
+await page.setViewportSize({ width: 1440, height: 860 });
 await page.waitForTimeout(120);
 const rows1280 = await page.locator('.topbar').evaluate((bar) => {
   const mids = [...bar.children].map((el) => {
@@ -510,7 +526,17 @@ const rows1280 = await page.locator('.topbar').evaluate((bar) => {
   });
   return new Set(mids).size;
 });
-check('lišta drží jeden riadok aj pri 1280 px', rows1280 === 1, `riadkov=${rows1280}`);
+check('lišta drží jeden riadok aj pri 1440 px', rows1280 === 1, `riadkov=${rows1280}`);
+
+// popisy tlačidiel musia byť vidieť – ikony samy o sebe nič nepovedia
+const labels = await page.evaluate(() => ['.tool[data-tool="pen"] i', '#btn-draw i',
+  '#btn-palette i', '#btn-calc i', '#btn-note i', '#btn-export i']
+  .map((sel) => {
+    const el = document.querySelector(sel);
+    return el && el.offsetParent !== null && el.textContent.trim().length > 0;
+  }));
+check('tlačidlá majú viditeľné popisy, nielen ikony',
+  labels.every(Boolean), `viditeľných=${labels.filter(Boolean).length}/${labels.length}`);
 await page.setViewportSize({ width: 1440, height: 900 });
 
 check('žiadne chyby v konzole počas testu', errors.length === 0, errors.slice(0, 3).join(' | '));
