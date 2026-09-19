@@ -20,11 +20,11 @@ window.MW = window.MW || {};
   var TPL_POINTS = 140;           // koľko bodov si necháme z kostry
   var INK_POINTS = 120;           // na koľko bodov prevzorkujeme ťahy myši
   var GRID_N = 20;                // rozlíšenie mriežky hustoty
-  var BLUR_SIGMA = 1.4;
-  var BLUR_RADIUS = 3;
+  var BLUR_SIGMA = 1.8;          // východisko; sady si ho môžu prebiť
   var W_CLOUD = 2.0;              // váha mračna bodov oproti mriežke
   var FLAT_LIMIT = 0.18;          // pod týmto pomerom strán je tvar už čiara
   var STRETCH_PENALTY = 1.1;      // zhoda v natiahnutom pohľade platí menej
+  var DESLANT_CAP = 0.35;         // viac už nie, nech „/" nesplynie s „|"
   var LEARNED_KEY = 'mw:ink-templates:v1';
   var LEARNED_BONUS = 0.82;       // vlastné predlohy sú dôveryhodnejšie
   var MAX_PER_SYMBOL = 8;
@@ -42,6 +42,18 @@ window.MW = window.MW || {};
     '"OpenSymbol","Symbola","Liberation Serif","Bitstream Charter",serif'
   ];
 
+  /* Pre písmená sa oplatí pridať rukopisné rezy – kde ich prehliadač má,
+   * vznikne predloha bližšia skutočnému písaniu. Kde nie sú, stack spadne
+   * na bežné písmo a rovnaká predloha sa zahodí ako duplikát. */
+  var LETTER_STACKS = [
+    '"Segoe UI","Helvetica Neue","DejaVu Sans","FreeSans",sans-serif',
+    '"Georgia","Times New Roman","DejaVu Serif","FreeSerif",serif',
+    '"Segoe Script","Bradley Hand","Comic Sans MS","Chalkboard","Comic Neue",cursive'
+  ];
+
+  // Ľudia píšu naklonene na obe strany, nielen kolmo.
+  var LETTER_SLANTS = [0, 0.22, -0.22];
+
   var canvas = null, ctx = null;
 
   function getCtx() {
@@ -56,22 +68,27 @@ window.MW = window.MW || {};
 
   /* ── 1. render glyfu do binárnej mriežky ──────────────────────────── */
 
-  function rasterize(ch, fontStack) {
+  /* slant je sklon ako pri šikmom písme: x sa posunie o slant × výšku.
+   * Predlohy sa stavajú aj naklonené, lebo málokto píše presne kolmo. */
+  function rasterize(ch, fontStack, slant) {
     var c = getCtx();
+    c.setTransform(1, 0, 0, 1, 0, 0);
     c.clearRect(0, 0, GRID, GRID);
     c.fillStyle = '#000';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
 
-    var size = 46;
+    var size = slant ? 40 : 46;
     c.font = size + 'px ' + fontStack;
     var w = c.measureText(ch).width;
-    var limit = GRID - 14;
+    var limit = GRID - 14 - Math.abs(slant || 0) * GRID * 0.5;
     if (w > limit && w > 0) {
       size = Math.max(10, Math.floor(size * limit / w));
       c.font = size + 'px ' + fontStack;
     }
+    if (slant) c.setTransform(1, 0, -slant, 1, slant * (GRID / 2), 0);
     c.fillText(ch, GRID / 2, GRID / 2);
+    c.setTransform(1, 0, 0, 1, 0, 0);
 
     var data = c.getImageData(0, 0, GRID, GRID).data;
     var grid = new Uint8Array(GRID * GRID);
@@ -215,7 +232,7 @@ window.MW = window.MW || {};
   /* Mriežka hustoty: body sa „rozmažú" do malej mriežky, takže sa
    * porovnáva rozloženie ťahov v ploche, nie len najbližší sused.
    * Toto rozlišuje tvary oveľa lepšie než samotné mračno bodov. */
-  function densityGrid(cloud) {
+  function densityGrid(cloud, kernel) {
     var g = new Float32Array(GRID_N * GRID_N), i;
     for (i = 0; i < cloud.length; i += 2) {
       var u = (cloud[i] + 0.5) * (GRID_N - 1);
@@ -230,7 +247,7 @@ window.MW = window.MW || {};
         }
       }
     }
-    blur(g);
+    blur(g, kernel);
     var sum = 0;
     for (i = 0; i < g.length; i++) sum += g[i] * g[i];
     sum = Math.sqrt(sum) || 1;
@@ -238,21 +255,34 @@ window.MW = window.MW || {};
     return g;
   }
 
-  var KERNEL = (function () {
-    var k = [], r = BLUR_RADIUS, s = BLUR_SIGMA, sum = 0, i;
-    for (i = -r; i <= r; i++) { var v = Math.exp(-(i * i) / (2 * s * s)); k.push(v); sum += v; }
+  function gauss(sigma) {
+    var r = Math.max(2, Math.ceil(2 * sigma)), k = [], sum = 0, i;
+    for (i = -r; i <= r; i++) { var v = Math.exp(-(i * i) / (2 * sigma * sigma)); k.push(v); sum += v; }
     for (i = 0; i < k.length; i++) k[i] /= sum;
+    k.radius = r;
     return k;
-  })();
+  }
 
-  function blur(g) {
-    var N = GRID_N, r = BLUR_RADIUS, tmp = new Float32Array(N * N), x, y, i, acc;
+  /* Nastavenia sú vlastnosťou sady, nie celého modulu: písmená chcú narovnať
+   * sklon rukopisu a hrubšie rozmazanie, tlačené symboly ani jedno – sú
+   * kolmé a rozdiely medzi nimi sú jemné. */
+  function makeSettings(o) {
+    o = o || {};
+    return {
+      deslant: o.deslant === undefined ? 0 : o.deslant,
+      deslantCap: o.deslantCap === undefined ? DESLANT_CAP : o.deslantCap,
+      kernel: gauss(o.sigma || BLUR_SIGMA)
+    };
+  }
+
+  function blur(g, k) {
+    var N = GRID_N, r = k.radius, tmp = new Float32Array(N * N), x, y, i, acc;
     for (y = 0; y < N; y++) {
       for (x = 0; x < N; x++) {
         acc = 0;
         for (i = -r; i <= r; i++) {
           var xx = x + i;
-          if (xx >= 0 && xx < N) acc += g[y * N + xx] * KERNEL[i + r];
+          if (xx >= 0 && xx < N) acc += g[y * N + xx] * k[i + r];
         }
         tmp[y * N + x] = acc;
       }
@@ -262,7 +292,7 @@ window.MW = window.MW || {};
         acc = 0;
         for (i = -r; i <= r; i++) {
           var yy = y + i;
-          if (yy >= 0 && yy < N) acc += tmp[yy * N + x] * KERNEL[i + r];
+          if (yy >= 0 && yy < N) acc += tmp[yy * N + x] * k[i + r];
         }
         g[y * N + x] = acc;
       }
@@ -297,12 +327,37 @@ window.MW = window.MW || {};
     return out;
   }
 
+  /* Zruší sklon rukopisu: nakloní tvar späť tak, aby x a y prestali spolu
+   * súvisieť. Šikmo písané „a" sa tým dostane na ten istý tvar ako kolmé.
+   * Naprávame len čiastočne a s hornou hranicou – inak by sa z „/" stalo „|".
+   * Predlohy prechádzajú tou istou úpravou, takže sa porovnáva rovnaké
+   * s rovnakým. */
+  function deslant(pts, cfg) {
+    if (cfg.deslant <= 0 || pts.length < 4) return pts;
+    var n = pts.length, sx = 0, sy = 0, i;
+    for (i = 0; i < n; i++) { sx += pts[i][0]; sy += pts[i][1]; }
+    var mx = sx / n, my = sy / n, cxy = 0, vy = 0;
+    for (i = 0; i < n; i++) {
+      var dx = pts[i][0] - mx, dy = pts[i][1] - my;
+      cxy += dx * dy;
+      vy += dy * dy;
+    }
+    if (vy < 1e-6) return pts;
+    var k = -(cxy / vy) * cfg.deslant;
+    if (k > cfg.deslantCap) k = cfg.deslantCap;
+    if (k < -cfg.deslantCap) k = -cfg.deslantCap;
+    var out = new Array(n);
+    for (i = 0; i < n; i++) out[i] = [pts[i][0] + k * (pts[i][1] - my), pts[i][1]];
+    return out;
+  }
+
   // Popis tvaru = mračno bodov + mriežka hustoty, v oboch pohľadoch.
-  function describe(pts) {
+  function describe(raw, cfg) {
+    var pts = deslant(raw, cfg);
     var cloud = normalize(pts);
-    var d = { cloud: cloud, grid: densityGrid(cloud), sCloud: null, sGrid: null };
+    var d = { cloud: cloud, grid: densityGrid(cloud, cfg.kernel), sCloud: null, sGrid: null };
     var s = normalizeStretched(pts);
-    if (s) { d.sCloud = s; d.sGrid = densityGrid(s); }
+    if (s) { d.sCloud = s; d.sGrid = densityGrid(s, cfg.kernel); }
     return d;
   }
 
@@ -340,7 +395,8 @@ window.MW = window.MW || {};
    * písmená abecedy potrebujú vlastné predlohy aj vlastnú pamäť rukopisu,
    * inak by si „O" a „\circ" liezli do cesty.
    * learnedKey je kľúč, pod ktorým si sada pamätá naučené ťahy. */
-  function makeRecognizer(learnedKey) {
+  function makeRecognizer(learnedKey, options) {
+    var cfg = makeSettings(options);
 
     var templates = [];     // {tex, shape}
     var learned = [];       // {tex, shape, pts}
@@ -353,7 +409,7 @@ window.MW = window.MW || {};
         var raw = JSON.parse(localStorage.getItem(learnedKey) || '[]');
         for (var i = 0; i < raw.length; i++) {
           if (!raw[i].pts || raw[i].pts.length < 4) continue;
-          learned.push({ tex: raw[i].tex, pts: raw[i].pts, shape: describe(raw[i].pts) });
+          learned.push({ tex: raw[i].tex, pts: raw[i].pts, shape: describe(raw[i].pts, cfg) });
         }
       } catch (e) { /* poškodené dáta ignorujeme */ }
     }
@@ -368,6 +424,8 @@ window.MW = window.MW || {};
 
     var Recognizer = {
       FONT_STACKS: FONT_STACKS,
+      LETTER_STACKS: LETTER_STACKS,
+      LETTER_SLANTS: LETTER_SLANTS,
 
       get ready() { return built; },
       get templateCount() { return templates.length; },
@@ -375,9 +433,10 @@ window.MW = window.MW || {};
 
       /* Postaví predlohy zo znakov v MW.SYMBOLS. Beží po častiach, aby
        * neblokovala vykresľovanie stránky. */
-      build: function (symbols, stacks, onProgress) {
+      build: function (symbols, stacks, slants) {
         symbols = symbols || MW.SYMBOLS;
         stacks = stacks || FONT_STACKS;
+        slants = slants || [0];
         if (typeof stacks === 'string') stacks = [stacks];
         templates = [];
         skipped = [];
@@ -395,27 +454,28 @@ window.MW = window.MW || {};
               if (!s.ch || NO_TEMPLATE[s.tex]) continue;
               var made = 0, seen = [];
               for (var f = 0; f < stacks.length; f++) {
-                var raster = rasterize(s.ch, stacks[f]);
-                if (raster.count < 6 || sameGrid(raster, notdef[f])) continue;
-                var dup = false;
-                for (var d = 0; d < seen.length; d++) if (sameGrid(raster, seen[d])) { dup = true; break; }
-                if (dup) continue;
-                seen.push(raster);
+                for (var k = 0; k < slants.length; k++) {
+                  var raster = rasterize(s.ch, stacks[f], slants[k]);
+                  if (raster.count < 6 || sameGrid(raster, notdef[f])) continue;
+                  var dup = false;
+                  for (var d = 0; d < seen.length; d++) if (sameGrid(raster, seen[d])) { dup = true; break; }
+                  if (dup) continue;
+                  seen.push(raster);
 
-                var skeleton = thin(raster.grid);
-                // Bodky a podobné drobné znaky sa stenčia takmer na nič –
-                // pre ne použijeme rovno vyplnený tvar.
-                if (skeleton.length < 6) skeleton = rasterPoints(raster.grid);
-                if (skeleton.length < 2) continue;
-                templates.push({
-                  tex: s.tex,
-                  shape: describe(subsample(skeleton, TPL_POINTS))
-                });
-                made++;
+                  var skeleton = thin(raster.grid);
+                  // Bodky a podobné drobné znaky sa stenčia takmer na nič –
+                  // pre ne použijeme rovno vyplnený tvar.
+                  if (skeleton.length < 6) skeleton = rasterPoints(raster.grid);
+                  if (skeleton.length < 2) continue;
+                  templates.push({
+                    tex: s.tex,
+                    shape: describe(subsample(skeleton, TPL_POINTS), cfg)
+                  });
+                  made++;
+                }
               }
               if (!made) skipped.push(s.tex);
             }
-            if (onProgress) onProgress(i / symbols.length);
             if (i < symbols.length) {
               setTimeout(chunk, 0);
             } else {
@@ -432,7 +492,7 @@ window.MW = window.MW || {};
         if (!built) return [];
         var pts = resampleStrokes(strokes, INK_POINTS);
         if (pts.length < 2) return [];
-        var ink = describe(pts);
+        var ink = describe(pts, cfg);
 
         var best = Object.create(null), i, d;
         for (i = 0; i < templates.length; i++) {
@@ -469,7 +529,7 @@ window.MW = window.MW || {};
           return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
         });
         if (pts.length < 2) return false;
-        learned.push({ tex: tex, pts: pts, shape: describe(pts) });
+        learned.push({ tex: tex, pts: pts, shape: describe(pts, cfg) });
         var mine = learned.filter(function (t) { return t.tex === tex; });
         if (mine.length > MAX_PER_SYMBOL) {
           learned.splice(learned.indexOf(mine[0]), 1);
@@ -487,7 +547,16 @@ window.MW = window.MW || {};
         rasterize: rasterize, thin: thin, normalize: normalize, subsample: subsample,
         cloudDistance: cloudDistance, resampleStrokes: resampleStrokes,
         describe: describe, shapeDistance: shapeDistance, setCloudWeight: setCloudWeight,
-        setStretchPenalty: function (v) { STRETCH_PENALTY = v; }
+        setStretchPenalty: function (v) { STRETCH_PENALTY = v; },
+        // Ladenie metriky pre testy; predlohy treba potom postaviť nanovo.
+        configure: function (o) {
+          if (o.gridN) GRID_N = o.gridN;
+          if (o.wCloud !== undefined) W_CLOUD = o.wCloud;
+          if (o.stretch !== undefined) STRETCH_PENALTY = o.stretch;
+          if (o.sigma) cfg.kernel = gauss(o.sigma);
+          if (o.deslant !== undefined) cfg.deslant = o.deslant;
+          if (o.deslantCap !== undefined) cfg.deslantCap = o.deslantCap;
+        }
       }
     };
 
@@ -497,5 +566,5 @@ window.MW = window.MW || {};
   MW.createRecognizer = makeRecognizer;
 
   // Matematické symboly – pôvodná sada, na ktorú sa odkazuje zvyšok appky.
-  MW.Recognizer = makeRecognizer(LEARNED_KEY);
+  MW.Recognizer = makeRecognizer(LEARNED_KEY, { deslant: 0, sigma: 1.4 });
 })();

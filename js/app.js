@@ -922,7 +922,7 @@
     var text = $('#note-text'), status = $('#note-status');
     var alts = $('#note-alts'), altsLabel = $('#note-alts-label');
     var recBtn = $('#note-rec');
-    var reader = MW.createRecognizer('mw:ink-letters:v1');
+    var reader = MW.createRecognizer('mw:ink-letters:v1', { deslant: 0.5, sigma: 1.8 });
     var track = MW.Handwriting.lineTracker();
 
     var recording = false, building = false;
@@ -1059,7 +1059,8 @@
       if (reader.ready || building) return;
       building = true;
       status.textContent = MW.t('note.preparing');
-      reader.build(MW.LETTERS.filter(function (l) { return !l.tiny; })).then(function (n) {
+      reader.build(MW.LETTERS.filter(function (l) { return !l.tiny; }),
+        reader.LETTER_STACKS, reader.LETTER_SLANTS).then(function (n) {
         building = false;
         status.textContent = MW.t('note.ready', { n: n });
       });

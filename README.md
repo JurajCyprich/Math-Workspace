@@ -135,15 +135,31 @@ Postavenie predlôh trvá ~220 ms, jeden dopyt ~14 ms.
 Písmená používajú ten istý stroj, len s vlastnou sadou predlôh a vlastnou
 pamäťou rukopisu – rozpoznávač je továrnička, nie jedináčik.
 
-Navyše im pomáha **výška ťahu**: tvar sám o sebe nerozlíši „C" od „c", lebo po
+Navyše sa pri nich rovnajú dve veci, ktoré pri tlačených symboloch nehrozia.
+**Sklon rukopisu**: tvar sa nakloní späť tak, aby x a y prestali spolu súvisieť,
+takže šikmo písané „a" sa dostane na ten istý tvar ako kolmé. Naprávame len
+polovicu a s hornou hranicou – inak by sa z „/" stalo „|". A **predlohy sa
+stavajú aj naklonené** na obe strany, plus z rukopisných rezov písma tam, kde
+ich prehliadač má. Rozmazanie mriežky je pri písmenách hrubšie než pri
+symboloch, lebo na jemných rozdieloch tu nezáleží tak ako na celkovom tvare.
+
+Ďalej im pomáha **výška ťahu**: tvar sám o sebe nerozlíši „C" od „c", lebo po
 normalizácii sú to tie isté body. Na voľnej ploche ale žiadne linajky nie sú,
 tak sa odhadujú priebežne z posledných napísaných znakov – základná linajka je
 spodok väčšiny z nich a stredná výška spodná tretina ich výšok. Na tom istom
 meraní stojí aj „0" verzus „o" či „P" verzus „p". Výška zhodu iba zdražuje,
 nikdy nevylučuje, takže keď sa zmeria zle, správny znak zostane v ponuke; kým
-nie je z čoho merať, výška sa neberie do úvahy vôbec. Posúva úspešnosť zo 40/62
-na **48/62 naprvýkrát a 57/62 do prvej trojice** (opäť naprieč písmom, ktoré
-predlohy nevideli).
+nie je z čoho merať, výška sa neberie do úvahy vôbec. Samotná výška posúva úspešnosť zo 42/62 na 50/62.
+
+Meria sa to na dvoch sadách. Na **čistých tvaroch** (glyf z písma, ktoré
+predlohy nevideli) trafí 50/62 naprvýkrát. Dôležitejšia je ale sada
+**nedbalého rukopisu**: ten istý znak skosený ako pri šikmom písme,
+pretiahnutý, pootočený a roztrasený – teda tak, ako ho človek naozaj napíše.
+Tam trafí **74 % naprvýkrát, 88 % do prvej trojice a 100 % do zoznamu ôsmich**.
+Narovnávanie sklonu a naklonené predlohy na tejto sade pridali 4 body
+naprvýkrát a 5 bodov do trojice; hrubšie rozmazanie na dvoch úrovniach naraz
+som skúsil tiež, ale nedbalému pridalo bod a čistým zobralo tri, tak v kóde
+nie je.
 
 Slovenská diakritika v sade zámerne nie je – mäkčeň či dĺžeň robí z glyfu tvar
 podobný „b" alebo „d" a vytláčal bežné písmená z ponuky; na klávesnici sa píše
