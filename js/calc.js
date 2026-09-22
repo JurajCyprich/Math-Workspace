@@ -15,13 +15,17 @@ window.MW = window.MW || {};
 
   function NotNumeric(msg) { this.message = msg || 'nedá sa vyčísliť'; }
 
-  /* ── mnohočleny ───────────────────────────────────────────────────── */
+  /* ── lomené výrazy ────────────────────────────────────────────────── */
 
-  /* Vyhodnocovač nepočíta s číslami, ale s mnohočlenmi v jednej neznámej:
-   * pole koeficientov [c0, c1, c2] znamená c0 + c1·x + c2·x².  Číslo je len
-   * mnohočlen nultého stupňa, takže bežné počítanie funguje ako predtým –
-   * a „2x + 3" prestane byť chyba. Rozdiel strán rovnice potom priamo dáva
-   * mnohočlen, ktorý stačí položiť rovný nule. */
+  /* Vyhodnocovač nepočíta s číslami, ale s podielom dvoch mnohočlenov v jednej
+   * neznámej: pole koeficientov [c0, c1, c2] znamená c0 + c1·x + c2·x².  Číslo
+   * je mnohočlen nultého stupňa delený jednotkou, takže bežné počítanie
+   * funguje ako predtým – a „2x + 3" ani „\frac{1}{x}" už nie sú chyba.
+   * Rozdiel strán rovnice po roznásobení menovateľov dáva mnohočlen, ktorý
+   * stačí položiť rovný nule.
+   *
+   * Každé delenie výrazom s neznámou si odloží podmienku: hodnota, pri ktorej
+   * by bol menovateľ nula, do riešenia patriť nesmie. */
   var EPS = 1e-10;
 
   function trimPoly(p) {
@@ -30,6 +34,8 @@ window.MW = window.MW || {};
   }
 
   function degree(p) { return trimPoly(p.slice()).length - 1; }
+
+  function isZero(p) { return degree(p) === 0 && Math.abs(p[0]) < EPS; }
 
   function addPoly(a, b, sign) {
     var n = Math.max(a.length, b.length), out = [];
@@ -45,32 +51,27 @@ window.MW = window.MW || {};
     return trimPoly(out);
   }
 
-  function divPoly(a, b) {
-    if (degree(b) > 0) throw new NotNumeric('delenie neznámou');
-    if (Math.abs(b[0]) < EPS) throw new NotNumeric('delenie nulou');
-    return trimPoly(a.map(function (c) { return c / b[0]; }));
-  }
-
-  function powPoly(base, exp) {
-    var n = constant(exp);
-    if (degree(base) === 0) return [Math.pow(base[0], n)];
-    if (Math.abs(n - Math.round(n)) > EPS || n < 0 || n > 8) {
-      throw new NotNumeric('neznáma v takejto mocnine');
-    }
-    var out = [1];
-    for (var i = 0; i < Math.round(n); i++) out = mulPoly(out, base);
+  function valueAt(p, x) {
+    var out = 0;
+    for (var i = p.length - 1; i >= 0; i--) out = out * x + p[i];
     return out;
   }
 
-  // Hodnota, ktorá musí byť číslo – napríklad argument sínusu.
-  function constant(p) {
-    if (degree(p) > 0) throw new NotNumeric('tu nesmie byť neznáma');
-    return p[0];
+  // Hodnota výrazu: podiel n/d. Obyčajné číslo má menovateľa 1.
+  function rat(n, d) { return { n: n, d: d || [1] }; }
+  function num(v) { return rat([v]); }
+
+  function rAdd(a, b, sign) {
+    return rat(addPoly(mulPoly(a.n, b.d), mulPoly(b.n, a.d), sign), mulPoly(a.d, b.d));
   }
 
-  function wrap(fn) {
-    return function (p) { return [fn(constant(p))]; };
-  }
+  function rMul(a, b) { return rat(mulPoly(a.n, b.n), mulPoly(a.d, b.d)); }
+
+  function rNeg(a) { return rat(addPoly([0], a.n, -1), a.d); }
+
+  function rIsNumber(a) { return degree(a.n) === 0 && degree(a.d) === 0; }
+
+  /* ── tabuľky príkazov ─────────────────────────────────────────────── */
 
   var FUNCS = {
     sin: Math.sin, cos: Math.cos, tan: Math.tan,
@@ -139,6 +140,37 @@ window.MW = window.MW || {};
   function parser(tokens) {
     var pos = 0;
     var unknown = null;          // jedna neznáma na výraz, viac sa riešiť nedá
+    var bans = [];               // menovatele, ktoré nesmú vyjsť na nulu
+
+    // Hodnota, ktorá musí byť číslo – napríklad argument sínusu.
+    function rConst(a) {
+      if (!rIsNumber(a)) throw new NotNumeric('tu nesmie byť neznáma');
+      if (Math.abs(a.d[0]) < EPS) throw new NotNumeric('delenie nulou');
+      return a.n[0] / a.d[0];
+    }
+
+    function rDiv(a, b) {
+      if (isZero(b.n)) throw new NotNumeric('delenie nulou');
+      if (degree(b.n) > 0) bans.push(b.n);          // podmienka pre riešenie
+      return rat(mulPoly(a.n, b.d), mulPoly(a.d, b.n));
+    }
+
+    function rPow(base, exp) {
+      var e = rConst(exp);
+      if (rIsNumber(base)) return num(Math.pow(rConst(base), e));
+      if (Math.abs(e - Math.round(e)) > EPS || Math.abs(e) > 8) {
+        throw new NotNumeric('neznáma v takejto mocnine');
+      }
+      e = Math.round(e);
+      var step = e < 0 ? rDiv(num(1), base) : base;
+      var out = num(1);
+      for (var i = 0; i < Math.abs(e); i++) out = rMul(out, step);
+      return out;
+    }
+
+    function wrap(fn) {
+      return function (a) { return num(fn(rConst(a))); };
+    }
 
     function peek() { return tokens[pos]; }
     function next() { return tokens[pos++]; }
@@ -167,53 +199,53 @@ window.MW = window.MW || {};
       var t = next();
       if (!t) throw new NotNumeric('výraz končí predčasne');
 
-      if (t.t === 'num') return [t.v];
+      if (t.t === 'num') return num(t.v);
 
       if (t.t === 'id') {
-        if (t.v === 'e') return [Math.E];
+        if (t.v === 'e') return num(Math.E);
         if (unknown && unknown !== t.v) throw new NotNumeric('viac neznámych naraz');
         unknown = t.v;
-        return [0, 1];
+        return rat([0, 1]);
       }
 
       if (t.t === 'op') {
         if (t.v === '(') { var a = expr(); eat(')'); return a; }
         if (t.v === '{') { var b = expr(); eat('}'); return b; }
         if (t.v === '[') { var c = expr(); eat(']'); return c; }
-        if (t.v === '-') return addPoly([0], unary(), -1);
+        if (t.v === '-') return rNeg(unary());
         if (t.v === '+') return unary();
         throw new NotNumeric('neočakávané ' + t.v);
       }
 
       // t.t === 'cmd'
       var name = t.v;
-      if (name === 'pi') return [Math.PI];
+      if (name === 'pi') return num(Math.PI);
 
       if (name === 'frac' || name === 'tfrac' || name === 'dfrac') {
-        return divPoly(group(), group());
+        return rDiv(group(), group());
       }
 
       if (name === 'sqrt') {
         var root = 2;
-        if (isOp('[')) { eat('['); root = constant(expr()); eat(']'); }
-        var arg = constant(group());
+        if (isOp('[')) { eat('['); root = rConst(expr()); eat(']'); }
+        var arg = rConst(group());
         if (root === 2) {
           if (arg < 0) throw new NotNumeric('odmocnina zo záporného čísla');
-          return [Math.sqrt(arg)];
+          return num(Math.sqrt(arg));
         }
         if (arg < 0) {
           // nepárny stupeň zo záporného čísla má reálny výsledok
           if (Math.abs(root % 2) !== 1) throw new NotNumeric('odmocnina zo záporného čísla');
-          return [-Math.pow(-arg, 1 / root)];
+          return num(-Math.pow(-arg, 1 / root));
         }
-        return [Math.pow(arg, 1 / root)];
+        return num(Math.pow(arg, 1 / root));
       }
 
-      if (name === 'abs') return [Math.abs(constant(group()))];
+      if (name === 'abs') return num(Math.abs(rConst(group())));
 
       if (name === 'log') {
         var base = 10;
-        if (isOp('_')) { eat('_'); base = constant(group()); }
+        if (isOp('_')) { eat('_'); base = rConst(group()); }
         return applyFunc(wrap(function (x) { return Math.log(x) / Math.log(base); }));
       }
 
@@ -227,7 +259,7 @@ window.MW = window.MW || {};
       var exp = null;
       if (isOp('^')) { eat('^'); exp = group(); }
       var value = fn(group());
-      return exp === null ? value : powPoly(value, exp);
+      return exp === null ? value : rPow(value, exp);
     }
 
     function isCmd(v) { var t = peek(); return !!t && t.t === 'cmd' && t.v === v; }
@@ -238,18 +270,18 @@ window.MW = window.MW || {};
       eat('^');
 
       // 30^\circ aj 30^{\circ} je uhol v stupňoch, nie mocnina
-      if (isCmd('circ')) { next(); return [constant(base) * Math.PI / 180]; }
+      if (isCmd('circ')) { next(); return num(rConst(base) * Math.PI / 180); }
       if (isOp('{')) {
         var mark = pos;
         eat('{');
-        if (isCmd('circ')) { next(); eat('}'); return [constant(base) * Math.PI / 180]; }
+        if (isCmd('circ')) { next(); eat('}'); return num(rConst(base) * Math.PI / 180); }
         pos = mark;                    // nebol to stupeň, ide o bežnú mocninu
       }
-      return powPoly(base, unary());
+      return rPow(base, unary());
     }
 
     function unary() {
-      if (isOp('-')) { eat('-'); return addPoly([0], unary(), -1); }
+      if (isOp('-')) { eat('-'); return rNeg(unary()); }
       if (isOp('+')) { eat('+'); return unary(); }
       return power();
     }
@@ -262,16 +294,16 @@ window.MW = window.MW || {};
         if (t.t === 'op' && (t.v === '*' || t.v === '/')) {
           next();
           var rhs = unary();
-          value = t.v === '*' ? mulPoly(value, rhs) : divPoly(value, rhs);
+          value = t.v === '*' ? rMul(value, rhs) : rDiv(value, rhs);
           continue;
         }
         if (t.t === 'cmd' && t.v in INFIX) {
           next();
           var r2 = unary();
-          value = INFIX[t.v] === '*' ? mulPoly(value, r2) : divPoly(value, r2);
+          value = INFIX[t.v] === '*' ? rMul(value, r2) : rDiv(value, r2);
           continue;
         }
-        if (startsValue()) { value = mulPoly(value, unary()); continue; }   // skryté násobenie
+        if (startsValue()) { value = rMul(value, unary()); continue; }   // skryté násobenie
         break;
       }
       return value;
@@ -280,8 +312,8 @@ window.MW = window.MW || {};
     function expr() {
       var value = term();
       for (;;) {
-        if (isOp('+')) { next(); value = addPoly(value, term(), 1); continue; }
-        if (isOp('-')) { next(); value = addPoly(value, term(), -1); continue; }
+        if (isOp('+')) { next(); value = rAdd(value, term(), 1); continue; }
+        if (isOp('-')) { next(); value = rAdd(value, term(), -1); continue; }
         break;
       }
       return value;
@@ -289,7 +321,8 @@ window.MW = window.MW || {};
 
     var result = expr();
     if (pos < tokens.length) throw new NotNumeric('zvyšok výrazu sa nedá prečítať');
-    return { poly: trimPoly(result), unknown: unknown };
+    if (isZero(result.d)) throw new NotNumeric('delenie nulou');
+    return { value: result, unknown: unknown, bans: bans };
   }
 
   /* ── verejné API ──────────────────────────────────────────────────── */
@@ -300,8 +333,8 @@ window.MW = window.MW || {};
     if (OPAQUE.test(src)) return null;
     try {
       var out = parser(tokenize(src));
-      if (out.poly.length !== 1) return null;        // zostala neznáma
-      var v = out.poly[0];
+      if (!rIsNumber(out.value)) return null;        // zostala neznáma
+      var v = out.value.n[0] / out.value.d[0];
       return isFinite(v) ? v : null;
     } catch (e) {
       return null;
@@ -338,12 +371,17 @@ window.MW = window.MW || {};
     return /^-?\d+(?:[.,]\d+)?$/.test(text) || /^-?\d+\{,\}\d+$/.test(text);
   }
 
-  // Rovnica, ktorá už je vyriešená: neznáma na jednej strane, číslo na druhej.
+  // Hotová odpoveď: číslo alebo zlomok z celých čísel.
+  function isExact(text) {
+    return isNumber(text) || /^-?\\[dt]?frac\{-?\d+\}\{-?\d+\}$/.test(text);
+  }
+
+  // Rovnica, ktorá už je vyriešená: neznáma na jednej strane, odpoveď na druhej.
   function alreadySolved(line) {
     var parts = String(line).split('=');
     if (parts.length !== 2) return false;
     var a = parts[0].trim(), b = parts[1].trim();
-    return (/^[a-zA-Z]$/.test(a) && isNumber(b)) || (/^[a-zA-Z]$/.test(b) && isNumber(a));
+    return (/^[a-zA-Z]$/.test(a) && isExact(b)) || (/^[a-zA-Z]$/.test(b) && isExact(a));
   }
 
   function lineExpression(line) {
@@ -360,10 +398,12 @@ window.MW = window.MW || {};
     return last;
   }
 
-  /* Vyrieši rovnicu o jednej neznámej. Obe strany sa prečítajú ako mnohočleny
-   * a ich rozdiel sa položí rovný nule; podľa stupňa ide o lineárnu alebo
-   * kvadratickú rovnicu. Grécke písmená sú príkazy, nie neznáme, takže
-   * fyzikálne vzťahy ako „c = \lambda f" sa riešiť nepokúša. */
+  /* Vyrieši rovnicu o jednej neznámej. Obe strany sa prečítajú ako lomené
+   * výrazy a rovnosť Ln/Ld = Rn/Rd sa roznásobí na Ln·Rd − Rn·Ld = 0; podľa
+   * stupňa ide o lineárnu alebo kvadratickú rovnicu. Korene, pri ktorých by
+   * niektorý menovateľ vyšiel na nulu, do definičného oboru nepatria a
+   * vyhadzujú sa. Grécke písmená sú príkazy, nie neznáme, takže fyzikálne
+   * vzťahy ako „c = \lambda f" sa riešiť nepokúša. */
   function solve(src) {
     if (!src || OPAQUE.test(src)) return null;
     var parts = String(src).split('=');
@@ -376,41 +416,118 @@ window.MW = window.MW || {};
       var name = left.unknown || right.unknown;
       if (!name) return null;                    // rovnica bez neznámej
 
-      var p = addPoly(left.poly, right.poly, -1);
+      var bans = left.bans.concat(right.bans);
+      var p = addPoly(mulPoly(left.value.n, right.value.d),
+        mulPoly(right.value.n, left.value.d), -1);
       var deg = degree(p);
 
       if (deg === 0) {
-        return { unknown: name, kind: Math.abs(p[0]) < EPS ? 'identity' : 'none', roots: [] };
+        if (Math.abs(p[0]) >= EPS) return { unknown: name, kind: 'none', roots: [], bans: bans };
+        return { unknown: name, kind: 'identity', roots: [], bans: bans };
       }
+
+      var roots = null;
       if (deg === 1) {
-        return { unknown: name, kind: 'linear', roots: [-p[0] / p[1]] };
-      }
-      if (deg === 2) {
+        roots = [-p[0] / p[1]];
+      } else if (deg === 2) {
         var c = p[0], b = p[1], a = p[2];
         var D = b * b - 4 * a * c;
-        if (D < -EPS) return { unknown: name, kind: 'complex', roots: [], D: D };
-        if (D <= EPS) return { unknown: name, kind: 'double', roots: [-b / (2 * a)], D: 0 };
-        var r = Math.sqrt(D);
-        return {
-          unknown: name, kind: 'quadratic', D: D,
-          roots: [(-b + r) / (2 * a), (-b - r) / (2 * a)]
-        };
+        if (D < -EPS) return { unknown: name, kind: 'complex', roots: [], D: D, bans: bans };
+        if (D <= EPS) {
+          roots = [-b / (2 * a)];
+        } else {
+          var r = Math.sqrt(D);
+          roots = [(-b + r) / (2 * a), (-b - r) / (2 * a)];
+        }
+      } else {
+        return null;                             // vyšší stupeň neriešime
       }
-      return null;                               // vyšší stupeň neriešime
+
+      roots = roots.filter(function (x) { return allowed(x, bans); });
+      if (!roots.length) return { unknown: name, kind: 'none', roots: [], bans: bans };
+      return {
+        unknown: name, roots: roots, bans: bans,
+        kind: roots.length === 1 ? (deg === 1 ? 'linear' : 'double') : 'quadratic'
+      };
     } catch (e) {
       return null;
     }
   }
 
+  // Koreň patrí do definičného oboru, len kým žiadny menovateľ nie je nula.
+  function allowed(x, bans) {
+    if (!isFinite(x)) return false;
+    for (var i = 0; i < bans.length; i++) {
+      if (Math.abs(valueAt(bans[i], x)) < 1e-8 * (1 + Math.abs(x))) return false;
+    }
+    return true;
+  }
+
+  // Hodnoty, pri ktorých by menovateľ vyšiel na nulu – na výpis definičného oboru.
+  function banned(bans) {
+    var out = [];
+    for (var i = 0; i < bans.length; i++) {
+      var p = bans[i], deg = degree(p), r = [];
+      if (deg === 1) r = [-p[0] / p[1]];
+      else if (deg === 2) {
+        var D = p[1] * p[1] - 4 * p[2] * p[0];
+        if (D < -EPS) r = [];
+        else if (D <= EPS) r = [-p[1] / (2 * p[2])];
+        else {
+          var q = Math.sqrt(D);
+          r = [(-p[1] + q) / (2 * p[2]), (-p[1] - q) / (2 * p[2])];
+        }
+      } else return null;                        // takýto menovateľ nevypíšeme
+      for (var j = 0; j < r.length; j++) {
+        if (out.every(function (v) { return Math.abs(v - r[j]) > EPS; })) out.push(r[j]);
+      }
+    }
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  /* Koreň ako zlomok, nie ako desatinné číslo: pri rovnici je „x = \frac{3}{2}"
+   * presná odpoveď, kým „1,5" je len jej zápis inak – a pri tretinách už len
+   * priblíženie. Najjednoduchší podiel sa hľadá reťazovým zlomkom; keď taký
+   * s rozumným menovateľom nesedí (iracionálny koreň), vráti sa null a číslo
+   * sa vypíše desatinne. */
+  function fraction(value) {
+    if (!isFinite(value) || Math.abs(value - Math.round(value)) < EPS) return null;
+    var sign = value < 0 ? '-' : '', x = Math.abs(value);
+    var h0 = 0, h1 = 1, k0 = 1, k1 = 0, b = x;
+
+    for (var i = 0; i < 24; i++) {
+      var a = Math.floor(b);
+      var h = a * h1 + h0, k = a * k1 + k0;
+      h0 = h1; h1 = h; k0 = k1; k1 = k;
+      if (k > 10000) return null;
+      if (Math.abs(x - h / k) < 1e-12 * Math.max(1, x)) {
+        return k === 1 ? null : sign + '\\frac{' + h + '}{' + k + '}';
+      }
+      var rest = b - a;
+      if (rest < 1e-12) return null;
+      b = 1 / rest;
+    }
+    return null;
+  }
+
+  function formatRoot(value, comma) { return fraction(value) || format(value, comma); }
+
   // Riešenie ako hotový zápis do vzorca.
   function solutionTex(sol, comma) {
     if (!sol) return null;
     var x = sol.unknown;
-    if (sol.kind === 'identity') return x + ' \\in \\mathbb{R}';
+
+    if (sol.kind === 'identity') {
+      var out = banned(sol.bans || []);
+      if (!out || !out.length) return x + ' \\in \\mathbb{R}';
+      return x + ' \\in \\mathbb{R} \\setminus \\{' + out.map(function (v) {
+        return formatRoot(v, comma);
+      }).join('; ') + '\\}';
+    }
     if (sol.kind === 'none' || sol.kind === 'complex') return x + ' \\notin \\mathbb{R}';
-    if (sol.roots.length === 1) return x + ' = ' + format(sol.roots[0], comma);
-    return x + '_{1} = ' + format(sol.roots[0], comma) +
-      ' \\quad ' + x + '_{2} = ' + format(sol.roots[1], comma);
+    if (sol.roots.length === 1) return x + ' = ' + formatRoot(sol.roots[0], comma);
+    return x + '_{1} = ' + formatRoot(sol.roots[0], comma) +
+      ' \\quad ' + x + '_{2} = ' + formatRoot(sol.roots[1], comma);
   }
 
   // Výsledok riadku ako hotový text do vzorca, alebo null.

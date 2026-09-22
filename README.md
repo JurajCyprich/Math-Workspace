@@ -72,11 +72,24 @@ tlačidlo s menom tej neznámej, napríklad `x=`. Po kliknutí pribudne riešeni
 x = 2
 ```
 
-Obe strany sa prečítajú ako mnohočleny a ich rozdiel sa položí rovný nule.
-Podľa stupňa ide o lineárnu alebo kvadratickú rovnicu – tá dá dva korene
-(`x_{1} = 1{,}5 \quad x_{2} = 1`), pri dvojnásobnom koreni jeden. Keď reálne
-riešenie neexistuje, vypíše sa `x \notin \mathbb{R}`; keď platí rovnica vždy,
-`x \in \mathbb{R}`. Neznáma sa nemusí volať `x` – `0,5t = 10` dá `t = 20`.
+Obe strany sa prečítajú ako lomené výrazy a rovnosť sa roznásobí na tvar
+`= 0`. Podľa stupňa ide o lineárnu alebo kvadratickú rovnicu – tá dá dva korene
+(`x_{1} = \frac{3}{2} \quad x_{2} = 1`), pri dvojnásobnom koreni jeden. Keď
+reálne riešenie neexistuje, vypíše sa `x \notin \mathbb{R}`; keď platí rovnica
+vždy, `x \in \mathbb{R}`. Neznáma sa nemusí volať `x` – `0,5t = 10` dá `t = 20`.
+
+**Riešenie je zlomok, nie desatinné číslo.** `2x = 3` dá `x = \frac{3}{2}`,
+nie `1,5` – pri tretinách by desatinné číslo bolo aj tak len priblíženie.
+Najjednoduchší podiel sa hľadá reťazovým zlomkom; keď taký s rozumným
+menovateľom nesedí (iracionálny koreň z `x^2 = 2`), vypíše sa desatinne.
+
+**Zlomkové rovnice** – neznáma smie byť aj v menovateli: `\frac{1}{x} = 2` dá
+`x = \frac{1}{2}`, `\frac{x}{x-2} = 3` dá `x = 3`. Funguje aj `1/x = 4` a
+`x^{-1} = 5`. Každé delenie výrazom s neznámou si odloží podmienku a koreň,
+pri ktorom by menovateľ vyšiel na nulu, sa **zahodí** – `\frac{x^2-1}{x-1} = 2`
+nemá riešenie, lebo jediný koreň `x = 1` nepatrí do definičného oboru.
+Keď rovnica platí všade okrem pár hodnôt, vypíše sa aj to:
+`\frac{x}{x} = 1` dá `x \in \mathbb{R} \setminus \{0\}`.
 
 Čo sa neponúka: viac neznámych naraz (`y = 2x + 1`), tretí a vyšší stupeň,
 riadky s indexmi či jednotkami a fyzikálne vzťahy ako `c = \lambda f` – grécke

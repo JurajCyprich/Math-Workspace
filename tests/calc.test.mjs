@@ -129,11 +129,37 @@ eq('5 - x = 2', 'x = 3');
 eq('0.5t = 10', 't = 20');                       // neznáma sa nemusí volať x
 eq('2 = x', 'x = 2');                            // neznáma vpravo
 eq('x^2 = 9', 'x_{1} = 3 \\quad x_{2} = -3');
-eq('2x^2 - 5x + 3 = 0', 'x_{1} = 1.5 \\quad x_{2} = 1');
+eq('2x^2 - 5x + 3 = 0', 'x_{1} = \\frac{3}{2} \\quad x_{2} = 1');
 eq('x^2 - 6x + 9 = 0', 'x = 3');                 // dvojnásobný koreň
 eq('x^2 + 1 = 0', 'x \\notin \\mathbb{R}');      // bez reálneho riešenia
 eq('x + 1 = x', 'x \\notin \\mathbb{R}');        // protirečenie
 eq('2x = 2x', 'x \\in \\mathbb{R}');             // platí vždy
+
+console.log('\nriešenie ako zlomok, nie ako desatinné číslo');
+eq('2x = 3', 'x = \\frac{3}{2}');
+eq('3x = 1', 'x = \\frac{1}{3}');
+eq('2x = -3', 'x = -\\frac{3}{2}');
+eq('4x = 2', 'x = \\frac{1}{2}');
+eq('6x = 4', 'x = \\frac{2}{3}');                 // podiel sa skráti
+eq('x + 1 = 3', 'x = 2');                        // celé číslo zlomok nepotrebuje
+eq('x^2 = 2', 'x_{1} = 1.4142135624 \\quad x_{2} = -1.4142135624');  // iracionálny koreň desatinne
+
+console.log('\nzlomkové rovnice');
+eq('\\frac{1}{x} = 2', 'x = \\frac{1}{2}');
+eq('\\frac{6}{x} = 3', 'x = 2');
+eq('\\frac{2}{x+1} = 1', 'x = 1');
+eq('\\frac{1}{x} + \\frac{1}{2} = 1', 'x = 2');
+eq('\\frac{x}{x-2} = 3', 'x = 3');
+eq('\\frac{x+1}{x} = 2', 'x = 1');
+eq('1/x = 4', 'x = \\frac{1}{4}');                 // aj s lomkou, nielen \\frac
+eq('x^{-1} = 5', 'x = \\frac{1}{5}');              // záporná mocnina je tiež zlomok
+eq('\\frac{1}{x} = 0', 'x \\notin \\mathbb{R}');  // nula sa zlomkom nedosiahne
+
+console.log('\ndefiničný obor – koreň zo zakázanej hodnoty neplatí');
+eq('\\frac{x}{x-1} = \\frac{1}{x-1}', 'x \\notin \\mathbb{R}');   // x = 1 je zakázané
+eq('\\frac{x^2-1}{x-1} = 2', 'x \\notin \\mathbb{R}');             // rovnako x = 1
+eq('\\frac{x}{x} = 1', 'x \\in \\mathbb{R} \\setminus \\{0\\}');  // platí všade okrem nuly
+eq('\\frac{(x-1)(x-3)}{x-1} = 0', 'x = 3');                        // koreň x = 1 vypadol
 
 console.log('\nčo sa riešiť nemá');
 const wont = (src, why) => ok(`${src}  →  nerieši sa (${why})`, solve(src) === null,
@@ -163,6 +189,10 @@ ok('hotové riešenie sa neponúka riešiť znova', lineAction('x = 2', false) =
 ok('ani so zápornou hodnotou', lineAction('x = -3', false) === null, act('x = -3'));
 ok('ani s desatinnou čiarkou', lineAction('x = 1{,}5', false) === null, act('x = 1{,}5'));
 ok('ani opačne zapísané', lineAction('2 = x', false) === null, act('2 = x'));
+ok('zlomková rovnica ponúkne riešenie',
+  lineAction('\\frac{1}{x} = 2', false).kind === 'solve', act('\\frac{1}{x} = 2'));
+ok('hotové riešenie v zlomku sa neponúka riešiť znova',
+  lineAction('x = \\frac{3}{2}', false).kind !== 'solve', act('x = \\frac{3}{2}'));
 ok('dvojica koreňov sa neponúka riešiť',
   lineAction('x_{1} = 3 \\quad x_{2} = -3', false) === null, act('x_{1} = 3 \\quad x_{2} = -3'));
 

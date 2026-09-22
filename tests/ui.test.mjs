@@ -393,6 +393,18 @@ check('v bloku nie je dvakrát to isté riešenie',
   blockText.split('\n').filter((l) => l.trim() === 'x = 2').length === 1,
   JSON.stringify(blockText));
 
+// zlomková rovnica – riešenie sa vypíše ako zlomok, nie desatinne
+await ta4.click();
+await ta4.press('Control+End');
+await ta4.type('\n\\frac{1}{x} = 2');
+await page.waitForTimeout(150);
+await calcBlock.locator('.calc-line.solve').last().click();
+await page.waitForTimeout(150);
+const fracSolved = await calcBlock.locator('textarea').inputValue();
+check('zlomková rovnica sa vyriešila zlomkom',
+  /\\frac\{1\}\{x\} = 2\nx = \\frac\{1\}\{2\}$/.test(fracSolved.trim()),
+  JSON.stringify(fracSolved.slice(-26)));
+
 /* 12d. poznámky z rukopisu ----------------------------------------- */
 await page.locator('#btn-note').click();
 await page.waitForSelector('#note:not([hidden])');

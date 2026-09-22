@@ -152,8 +152,8 @@ window.MW = window.MW || {};
       'Root with a degree: <code>\\sqrt[3]{8}</code> gives ∛8'],
     'help.writing.8': ['Pri riadku, ktorý sa dá vyčísliť, sa vpravo ukáže <b>=</b> – klikni a výsledok sa dopíše',
       'A line that can be worked out shows <b>=</b> on the right – click it and the result is added'],
-    'help.writing.9': ['Rovnicu s jednou neznámou vyrieši <b>x=</b> – riešenie pribudne pod ňu',
-      'An equation with one unknown is solved by <b>x=</b> – the solution appears below it'],
+    'help.writing.9': ['Rovnicu s jednou neznámou – aj zlomkovú – vyrieši <b>x=</b>; riešenie pribudne pod ňu ako zlomok',
+      'An equation with one unknown – fractional ones too – is solved by <b>x=</b>; the solution appears below it as a fraction'],
 
     'help.symbols': ['Symboly, ktoré nie sú na klávesnici', 'Symbols that are not on the keyboard'],
     'help.symbols.1': ['<b>Nakresliť symbol</b> – nakresli ho myšou, appka ponúkne zhody',

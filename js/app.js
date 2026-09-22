@@ -62,10 +62,12 @@
 
   function decimalComma() { return MW.lang() !== 'en'; }
 
-  // Rovnica, ktorá už má riešenie hneď pod sebou, tlačidlo nepotrebuje –
-  // inak by sa ten istý riadok dal dopisovať donekonečna.
+  /* Rovnica, ktorá už má riešenie hneď pod sebou, tlačidlo nepotrebuje –
+   * inak by sa ten istý riadok dal dopisovať donekonečna. Stačí začiatok
+   * riadku: k riešeniu „x = \frac{3}{2}" si user môže dopísať aj desatinnú
+   * hodnotu a stále je to to isté riešenie. */
   function hasSolutionBelow(lines, i, act) {
-    return (lines[i + 1] || '').trim() === act.text.trim();
+    return (lines[i + 1] || '').trim().indexOf(act.text.trim()) === 0;
   }
 
   function contentHtml(text, math) {
