@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sandbox = { MW: {} };
 new Function('window', readFileSync(resolve(root, 'js/calc.js'), 'utf8'))(sandbox);
-const { evaluate, format, lineResult, lineExpression } = sandbox.MW.Calc;
+const { evaluate, format, lineResult, lineExpression, solve, solutionTex, lineAction } = sandbox.MW.Calc;
 
 let failed = 0;
 const near = (a, b) => a !== null && Math.abs(a - b) < 1e-9;
@@ -116,6 +116,55 @@ ok('poznámka pod „#" sa nepočíta', lineResult('# 2 + 3', false) === null);
 ok('riadok s premennou sa nepočíta', lineResult('y = 2x', false) === null);
 ok('výraz sa berie spoza posledného „="',
   lineExpression('a = b = 2+3') === '2+3', String(lineExpression('a = b = 2+3')));
+
+console.log('\nrovnice o jednej neznámej');
+function eq(src, want) {
+  const got = solutionTex(solve(src), false);
+  ok(`${src}  →  ${want}`, got === want, JSON.stringify(got));
+}
+eq('2x + 3 = 7', 'x = 2');
+eq('3(x - 1) = x + 5', 'x = 4');
+eq('\\frac{x}{2} + 1 = 4', 'x = 6');
+eq('5 - x = 2', 'x = 3');
+eq('0.5t = 10', 't = 20');                       // neznáma sa nemusí volať x
+eq('2 = x', 'x = 2');                            // neznáma vpravo
+eq('x^2 = 9', 'x_{1} = 3 \\quad x_{2} = -3');
+eq('2x^2 - 5x + 3 = 0', 'x_{1} = 1.5 \\quad x_{2} = 1');
+eq('x^2 - 6x + 9 = 0', 'x = 3');                 // dvojnásobný koreň
+eq('x^2 + 1 = 0', 'x \\notin \\mathbb{R}');      // bez reálneho riešenia
+eq('x + 1 = x', 'x \\notin \\mathbb{R}');        // protirečenie
+eq('2x = 2x', 'x \\in \\mathbb{R}');             // platí vždy
+
+console.log('\nčo sa riešiť nemá');
+const wont = (src, why) => ok(`${src}  →  nerieši sa (${why})`, solve(src) === null,
+  JSON.stringify(solutionTex(solve(src), false)));
+wont('y = 2x + 1', 'dve neznáme');
+wont('v = g t', 'fyzikálny vzťah, tri neznáme');
+wont('c = \\lambda f', 'grécke písmeno nie je neznáma');
+wont('2 + 3 = 5', 'žiadna neznáma');
+wont('x^3 = 8', 'tretí stupeň');
+wont('E_k = \\tfrac{1}{2} m v^2', 'index aj viac neznámych');
+wont('2x + 3', 'chýba druhá strana');
+wont('a = b = c', 'dve rovná sa');
+
+console.log('\nčo ponúknuť pri riadku');
+const act = (src) => JSON.stringify(lineAction(src, false));
+ok('číselný riadok ponúkne dopočítanie',
+  lineAction('25 - 24', false).kind === 'value', act('25 - 24'));
+ok('rovnica ponúkne riešenie',
+  lineAction('2x + 3 = 7', false).kind === 'solve', act('2x + 3 = 7'));
+ok('kvadratická rovnica ponúkne riešenie',
+  lineAction('2x^2 - 5x + 3 = 0', false).kind === 'solve', act('2x^2 - 5x + 3 = 0'));
+ok('hotový výpočet už neponúka nič', lineAction('2 + 3 = 5', false) === null);
+ok('poznámka pod „#" neponúka nič', lineAction('# 2x = 4', false) === null);
+ok('tlačidlo pozná meno neznámej',
+  lineAction('0.5t = 10', false).unknown === 't', act('0.5t = 10'));
+ok('hotové riešenie sa neponúka riešiť znova', lineAction('x = 2', false) === null, act('x = 2'));
+ok('ani so zápornou hodnotou', lineAction('x = -3', false) === null, act('x = -3'));
+ok('ani s desatinnou čiarkou', lineAction('x = 1{,}5', false) === null, act('x = 1{,}5'));
+ok('ani opačne zapísané', lineAction('2 = x', false) === null, act('2 = x'));
+ok('dvojica koreňov sa neponúka riešiť',
+  lineAction('x_{1} = 3 \\quad x_{2} = -3', false) === null, act('x_{1} = 3 \\quad x_{2} = -3'));
 
 console.log(failed ? `\nPADLO: ${failed} kontrol` : '\nOK – všetko prešlo');
 process.exit(failed ? 1 : 0);

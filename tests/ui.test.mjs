@@ -302,6 +302,11 @@ check('pri premennej kalkulačka nehádže výsledok',
   (await page.locator('#calc-result')).evaluate ? await page.locator('#calc-result').evaluate(
     (el) => el.classList.contains('bad')) : false);
 
+await page.locator('#calc-input').fill('2x + 3 = 7');
+await page.waitForTimeout(120);
+const eqOut = (await page.locator('#calc-result').textContent()).replace(/\s+/g, '');
+check('kalkulačka vyrieši rovnicu', eqOut.includes('x=2') && !eqOut.startsWith('='), eqOut);
+
 // číselník vkladá na miesto kurzora a skáče do zátvorky
 await page.locator('#calc-input').fill('');
 await page.locator('#calc-keys button[data-key="\\\\sqrt{}"]').click();
@@ -353,6 +358,40 @@ await page.waitForTimeout(150);
 const stillOffered = await calcBlock.locator('.calc-line').count();
 check('hotový riadok už tlačidlo neponúka', stillOffered === calcButtons - 1,
   `pred=${calcButtons} po=${stillOffered}`);
+
+/* 12c-2. riešenie rovnice v bloku ----------------------------------- */
+if ((await page.locator('.block.editing').count()) === 0) {
+  await calcBlock.locator('.render').click();
+  await page.waitForSelector('.block.editing textarea');
+}
+const ta4 = calcBlock.locator('textarea');
+await ta4.click();
+await ta4.press('Control+End');
+await ta4.type('\n2x + 3 = 7');
+await page.waitForTimeout(150);
+
+const solveBtn = calcBlock.locator('.calc-line.solve');
+const solveCount = await solveBtn.count();
+check('rovnica dostala tlačidlo na vyriešenie', solveCount >= 1, `tlačidiel=${solveCount}`);
+check('tlačidlo hlási meno neznámej',
+  (await solveBtn.last().textContent()).trim() === 'x=',
+  JSON.stringify(await solveBtn.last().textContent()));
+
+await solveBtn.last().hover();
+await page.screenshot({ path: resolve(shots, '09b-rovnica.png') });
+await solveBtn.last().click();
+await page.waitForTimeout(150);
+const eqSolved = await calcBlock.locator('textarea').inputValue();
+check('riešenie pribudlo na nový riadok pod rovnicou',
+  /2x \+ 3 = 7\nx = 2$/.test(eqSolved.trim()), JSON.stringify(eqSolved.slice(-22)));
+check('rovnica sama ostala nedotknutá', eqSolved.includes('2x + 3 = 7'));
+check('hotové riešenie sa už riešiť neponúka',
+  (await calcBlock.locator('.calc-line.solve').count()) === solveCount - 1,
+  `pred=${solveCount} po=${await calcBlock.locator('.calc-line.solve').count()}`);
+const blockText = await calcBlock.locator('textarea').inputValue();
+check('v bloku nie je dvakrát to isté riešenie',
+  blockText.split('\n').filter((l) => l.trim() === 'x = 2').length === 1,
+  JSON.stringify(blockText));
 
 /* 12d. poznámky z rukopisu ----------------------------------------- */
 await page.locator('#btn-note').click();

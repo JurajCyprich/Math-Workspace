@@ -62,9 +62,16 @@
 
   function decimalComma() { return MW.lang() !== 'en'; }
 
+  // Rovnica, ktorá už má riešenie hneď pod sebou, tlačidlo nepotrebuje –
+  // inak by sa ten istý riadok dal dopisovať donekonečna.
+  function hasSolutionBelow(lines, i, act) {
+    return (lines[i + 1] || '').trim() === act.text.trim();
+  }
+
   function contentHtml(text, math) {
     if (!text.trim()) return '<div class="empty">' + esc(MW.t('block.empty')) + '</div>';
-    return text.split('\n').map(function (line, i) {
+    var lines = text.split('\n');
+    return lines.map(function (line, i) {
       if (!line.trim()) return '<div class="line">&nbsp;</div>';
       var t = line.trim();
       if (t.charAt(0) === '#') {
@@ -72,11 +79,18 @@
       }
       if (!math) return '<div class="line textline">' + mixedLine(line) + '</div>';
 
-      // Riadok, ktorý sa dá vyčísliť, dostane tlačidlo na dopočítanie.
-      var can = MW.Calc.lineResult(line, decimalComma()) !== null;
-      return '<div class="line">' + renderMath(line, true) +
-        (can ? '<button class="calc-line" data-line="' + i + '" title="' +
-          esc(MW.t('calc.line.t')) + '">=</button>' : '') + '</div>';
+      // Riadok, ktorý sa dá dopočítať alebo vyriešiť, dostane tlačidlo.
+      var act = MW.Calc.lineAction(line, decimalComma());
+      if (act && act.kind === 'solve' && hasSolutionBelow(lines, i, act)) act = null;
+      var btn = '';
+      if (act) {
+        var solving = act.kind === 'solve';
+        btn = '<button class="calc-line' + (solving ? ' solve' : '') +
+          '" data-line="' + i + '" title="' +
+          esc(MW.t(solving ? 'calc.solve.t' : 'calc.line.t')) + '">' +
+          (solving ? esc(act.unknown) + '=' : '=') + '</button>';
+      }
+      return '<div class="line">' + renderMath(line, true) + btn + '</div>';
     }).join('');
   }
 
@@ -224,21 +238,29 @@
     Notepad.relabel();
   }
 
-  // Dopíše výsledok na koniec riadku. Prázdne „=" na konci nezdvojujeme.
+  /* Dopíše výsledok na koniec riadku – prázdne „=" na konci nezdvojujeme.
+   * Riešenie rovnice sa nedopisuje za ňu, ale na nový riadok pod ňu. */
   function solveLine(data, index) {
     var lines = data.text.split('\n');
-    var result = MW.Calc.lineResult(lines[index], decimalComma());
-    if (result === null) return;
+    var act = MW.Calc.lineAction(lines[index], decimalComma());
+    if (!act) return;
+    if (act.kind === 'solve' && hasSolutionBelow(lines, index, act)) return;
 
     beginStep();
     commitStep();
-    lines[index] = lines[index].replace(/\s*=\s*$/, '') + ' = ' + result;
+    if (act.kind === 'solve') {
+      // Odsadenie si nechá také, aké má rovnica, nech to drží pokope.
+      var indent = (lines[index].match(/^\s*/) || [''])[0];
+      lines.splice(index + 1, 0, indent + act.text);
+    } else {
+      lines[index] = lines[index].replace(/\s*=\s*$/, '') + ' = ' + act.text;
+    }
     data.text = lines.join('\n');
     data.ta.value = data.text;
     autosize(data.ta);
     paint(data);
     save();
-    toast(MW.t('toast.calc'));
+    toast(MW.t(act.kind === 'solve' ? 'toast.solved' : 'toast.calc'));
   }
 
   function autosize(ta) {
@@ -1173,9 +1195,13 @@
 
     try { history = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { history = []; }
 
+    // Buď hodnota výrazu, alebo riešenie rovnice – podľa toho, čo je napísané.
     function value() {
       var v = MW.Calc.evaluate(input.value);
-      return v === null ? null : MW.Calc.format(v, decimalComma());
+      if (v !== null) return { kind: 'value', text: MW.Calc.format(v, decimalComma()) };
+      var sol = MW.Calc.solve(input.value);
+      var tex = MW.Calc.solutionTex(sol, decimalComma());
+      return tex ? { kind: 'solve', text: tex } : null;
     }
 
     function show() {
@@ -1184,20 +1210,21 @@
       out.classList.toggle('bad', r === null);
       out.innerHTML = r === null
         ? esc(MW.t('calc.bad'))
-        : '= ' + renderMath(r, false);
+        : (r.kind === 'solve' ? '' : '= ') + renderMath(r.text, false);
     }
 
     function drawHistory() {
       list.innerHTML = history.map(function (h) {
         return '<button class="hit" data-expr="' + esc(h.expr) + '">' +
           '<span class="meta"><span class="nm">' + renderMath(h.expr, false) + '</span>' +
-          '<span class="tx">= ' + esc(h.result) + '</span></span></button>';
+          '<span class="tx">' + (h.kind === 'solve' ? '' : '= ') +
+          esc(h.result) + '</span></span></button>';
       }).join('');
     }
 
-    function remember(expr, result) {
+    function remember(expr, result, kind) {
       history = history.filter(function (h) { return h.expr !== expr; });
-      history.unshift({ expr: expr, result: result });
+      history.unshift({ expr: expr, result: result, kind: kind });
       history = history.slice(0, 10);
       try { localStorage.setItem(KEY, JSON.stringify(history)); } catch (e) { /* nevadí */ }
       drawHistory();
@@ -1223,7 +1250,7 @@
     function commit() {
       var r = value();
       if (r === null) { toast(MW.t(input.value.trim() ? 'calc.bad' : 'calc.empty')); return null; }
-      remember(input.value.trim(), r);
+      remember(input.value.trim(), r.text, r.kind);
       return r;
     }
 
@@ -1261,7 +1288,10 @@
     $('#calc-insert').addEventListener('click', function () {
       var r = commit();
       if (r === null) return;
-      insertText(input.value.trim() + ' = ' + r);
+      // Rovnica ide aj s riešením, každé na svoj riadok.
+      insertText(r.kind === 'solve'
+        ? input.value.trim() + '\n' + r.text
+        : input.value.trim() + ' = ' + r.text);
       toast(MW.t('toast.inserted'));
     });
 

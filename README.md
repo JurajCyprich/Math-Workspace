@@ -63,6 +63,29 @@ Výraz sa píše tak, ako sa píše vzorec: `\frac{5+1}{4}`, `\sqrt[3]{8}`, `2\p
 `\sin(30^\circ)`, `\log_{2}{8}`, `1{,}5`. Desatinná čiarka aj bodka fungujú a
 výsledok sa vypíše podľa zvoleného jazyka.
 
+**Riešenie rovníc** – rovnica s dvomi stranami a jednou neznámou dostane vpravo
+tlačidlo s menom tej neznámej, napríklad `x=`. Po kliknutí pribudne riešenie na
+**nový riadok pod rovnicou**, aby zadanie ostalo nedotknuté:
+
+```
+2x + 3 = 7
+x = 2
+```
+
+Obe strany sa prečítajú ako mnohočleny a ich rozdiel sa položí rovný nule.
+Podľa stupňa ide o lineárnu alebo kvadratickú rovnicu – tá dá dva korene
+(`x_{1} = 1{,}5 \quad x_{2} = 1`), pri dvojnásobnom koreni jeden. Keď reálne
+riešenie neexistuje, vypíše sa `x \notin \mathbb{R}`; keď platí rovnica vždy,
+`x \in \mathbb{R}`. Neznáma sa nemusí volať `x` – `0,5t = 10` dá `t = 20`.
+
+Čo sa neponúka: viac neznámych naraz (`y = 2x + 1`), tretí a vyšší stupeň,
+riadky s indexmi či jednotkami a fyzikálne vzťahy ako `c = \lambda f` – grécke
+písmená sú príkazy, nie neznáme. Rovnica, ktorá už má riešenie hneď pod sebou,
+tlačidlo nedostane, takže sa nedá dopisovať dookola.
+
+Rovnicu rieši aj kalkulačka: keď do nej napíšeš `2x + 3 = 7`, ukáže `x = 2`
+a *Vložiť do plochy* vloží rovnicu aj s riešením pod ňou.
+
 Vyhodnocovanie má vlastný tokenizer a parser (`js/calc.js`) – zámerne **nie**
 `eval()`. Do plochy sa dá napísať čokoľvek a nič z toho sa nesmie spustiť ako kód.
 
